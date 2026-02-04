@@ -1,7 +1,7 @@
 // server/utils/cookies.ts
 
 import { Response } from 'express';
-import { isProduction } from '../config/env.js';
+import { env, isProduction } from '../config/env.js';
 
 interface TokenPair {
   accessToken: string;
@@ -13,6 +13,8 @@ export const setAuthCookies = (res: Response, tokens: TokenPair) => {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? 'none' as const : 'lax' as const,
+    domain: env.COOKIE_DOMAIN,
+    path: '/',
   };
 
   res.cookie('accessToken', tokens.accessToken, {
@@ -31,6 +33,8 @@ export const clearAuthCookies = (res: Response) => {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? 'none' as const : 'lax' as const,
+    domain: env.COOKIE_DOMAIN,
+    path: '/',
   };
 
   res.clearCookie('accessToken', cookieOptions);

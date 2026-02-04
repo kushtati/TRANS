@@ -16,6 +16,9 @@ export const env = {
   // Frontend
   FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:5173',
   
+  // Cookies
+  COOKIE_DOMAIN: process.env.COOKIE_DOMAIN || undefined,
+  
   // Email (Resend)
   RESEND_API_KEY: process.env.RESEND_API_KEY || '',
   FROM_EMAIL: process.env.FROM_EMAIL || 'onboarding@resend.dev',
