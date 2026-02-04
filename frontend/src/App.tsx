@@ -109,7 +109,7 @@ export default function App() {
           <VerifyEmailScreen
             email={pendingEmail}
             onSuccess={setUser}
-            onBack={() => setAuthScreen('login')}
+            onBack={() => setAuthScreen('register')}
           />
         );
     }
