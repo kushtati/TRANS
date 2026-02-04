@@ -116,18 +116,6 @@ app.use('/api/shipments', shipmentRoutes);
 app.use('/api/finance', financeRoutes);
 app.use('/api/ai', aiRoutes);
 
-// Serve static files in production
-if (isProduction) {
-  const distPath = path.join(__dirname, '../dist');
-  app.use(express.static(distPath));
-  
-  app.get('*', (req, res) => {
-    if (!req.path.startsWith('/api')) {
-      res.sendFile(path.join(distPath, 'index.html'));
-    }
-  });
-}
-
 // 404 handler
 app.use('/api/*', (req, res) => {
   res.status(404).json({ success: false, message: 'Route non trouvée' });
