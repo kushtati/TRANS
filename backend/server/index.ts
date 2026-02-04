@@ -73,10 +73,11 @@ const globalLimiter = rateLimit({
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: isProduction ? 10 : 100,
+  max: isProduction ? 100 : 1000,
   message: { success: false, message: 'Trop de tentatives, réessayez dans 15 minutes' },
   standardHeaders: true,
   legacyHeaders: false,
+  skipSuccessfulRequests: true, // Ne compte que les échecs
 });
 
 app.use(globalLimiter);

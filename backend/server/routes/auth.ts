@@ -557,4 +557,18 @@ router.post('/logout', auth, async (req: Request, res: Response) => {
   }
 });
 
+// ============================================
+// GET /api/auth/debug-email (dev)
+// ============================================
+
+router.get('/debug-email', (req: Request, res: Response) => {
+  const hasResendKey = !!process.env.RESEND_API_KEY;
+  res.json({ 
+    success: true,
+    emailConfigured: hasResendKey,
+    fromEmail: process.env.FROM_EMAIL || 'noreply@e-trans.app',
+    keyLength: hasResendKey ? process.env.RESEND_API_KEY?.length : 0,
+  });
+});
+
 export default router;
