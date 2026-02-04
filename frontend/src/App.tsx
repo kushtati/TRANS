@@ -31,6 +31,7 @@ export default function App() {
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [selectedShipmentId, setSelectedShipmentId] = useState<string | null>(null);
   const [pendingEmail, setPendingEmail] = useState('');
+  const [registerStep, setRegisterStep] = useState<1 | 2>(1);
 
   useEffect(() => {
     checkAuth();
@@ -102,6 +103,7 @@ export default function App() {
               setAuthScreen('verify');
             }}
             onLogin={() => setAuthScreen('login')}
+            initialStep={registerStep}
           />
         );
       case 'verify':
@@ -109,7 +111,10 @@ export default function App() {
           <VerifyEmailScreen
             email={pendingEmail}
             onSuccess={setUser}
-            onBack={() => setAuthScreen('register')}
+            onBack={() => {
+              setRegisterStep(2);
+              setAuthScreen('register');
+            }}
           />
         );
     }

@@ -10,6 +10,7 @@ import { api, ApiError } from '../../lib/api';
 interface RegisterScreenProps {
   onSuccess: (email: string) => void;
   onLogin: () => void;
+  initialStep?: 1 | 2;
 }
 
 interface FormData {
@@ -21,8 +22,8 @@ interface FormData {
   phone: string;
 }
 
-export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onSuccess, onLogin }) => {
-  const [step, setStep] = useState<1 | 2>(1);
+export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onSuccess, onLogin, initialStep = 1 }) => {
+  const [step, setStep] = useState<1 | 2>(initialStep);
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
