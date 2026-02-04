@@ -18,7 +18,7 @@ export const env = {
   
   // Email (Resend)
   RESEND_API_KEY: process.env.RESEND_API_KEY || '',
-  FROM_EMAIL: process.env.FROM_EMAIL || 'noreply@e-trans.app',
+  FROM_EMAIL: process.env.FROM_EMAIL || 'onboarding@resend.dev',
   
   // AI (Gemini)
   GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
