@@ -3,6 +3,21 @@
 // URL de l'API Backend (Railway)
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
+// Log API configuration in development/production
+if (typeof window !== 'undefined') {
+  console.log('🔧 API Configuration:', {
+    apiBase: API_BASE,
+    isLocalhost: API_BASE.includes('localhost'),
+    hasViteApiUrl: !!import.meta.env.VITE_API_URL,
+    mode: import.meta.env.MODE,
+  });
+
+  // Warning if using localhost in production
+  if (!import.meta.env.DEV && API_BASE.includes('localhost')) {
+    console.error('⚠️ WARNING: Using localhost API in production! Configure VITE_API_URL on Vercel.');
+  }
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -63,7 +78,15 @@ class ApiClient {
       return { data: json.data || json, success: true };
     } catch (error) {
       if (error instanceof ApiError) throw error;
-      throw new ApiError('Erreur de connexion au serveur', 0);
+      
+      // Enhanced error message for network errors
+      const isLocalhost = API_BASE.includes('localhost');
+      const errorMessage = isLocalhost && !import.meta.env.DEV
+        ? '❌ API non accessible. Configurez VITE_API_URL sur Vercel avec votre URL Railway.'
+        : 'Erreur de connexion au serveur';
+      
+      console.error('API Request Failed:', { url, error, isLocalhost });
+      throw new ApiError(errorMessage, 0);
     }
   }
 
