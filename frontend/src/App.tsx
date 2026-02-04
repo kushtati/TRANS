@@ -21,7 +21,7 @@ import { SettingsView } from './components/SettingsView';
 
 import { Loader2 } from 'lucide-react';
 
-type View = 'dashboard' | 'create' | 'detail' | 'settings';
+type View = 'dashboard' | 'create' | 'detail' | 'settings' | 'shipment' | 'accounting' | 'calculator' | 'assistant';
 type AuthScreen = 'welcome' | 'login' | 'register' | 'verify';
 
 export default function App() {
