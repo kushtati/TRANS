@@ -13,7 +13,8 @@ export const setAuthCookies = (res: Response, tokens: TokenPair) => {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? 'none' as const : 'lax' as const,
-    domain: env.COOKIE_DOMAIN,
+    // Domain NOT set for cross-origin cookies (vercel.app <-> railway.app)
+    // Setting domain would restrict cookies to that domain only
     path: '/',
   };
 
@@ -33,7 +34,7 @@ export const clearAuthCookies = (res: Response) => {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? 'none' as const : 'lax' as const,
-    domain: env.COOKIE_DOMAIN,
+    // Domain NOT set for cross-origin cookies
     path: '/',
   };
 
