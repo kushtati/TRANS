@@ -87,7 +87,7 @@ export default function App() {
         return (
           <LoginScreen
             onSuccess={setUser}
-            onRegister={() => setAuthScreen('register')}
+            onBack={() => setAuthScreen('welcome')}
             onNeedsVerification={(email) => {
               setPendingEmail(email);
               setAuthScreen('verify');

@@ -1,19 +1,21 @@
 // src/components/auth/LoginScreen.tsx
 
 import React, { useState } from 'react';
-import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, Ship } from 'lucide-react';
+import { 
+  Mail, Lock, ArrowLeft, Loader2, Eye, EyeOff, 
+  AlertCircle, Zap 
+} from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
-import type { User } from '../../types';
 
 interface LoginScreenProps {
-  onSuccess: (user: User) => void;
-  onRegister: () => void;
+  onBack: () => void;
+  onSuccess: (user: any) => void;
   onNeedsVerification: (email: string) => void;
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({
+export const LoginScreen: React.FC<LoginScreenProps> = ({ 
+  onBack, 
   onSuccess,
-  onRegister,
   onNeedsVerification,
 }) => {
   const [email, setEmail] = useState('');
@@ -22,27 +24,41 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // ============================================
+  // HANDLERS
+  // ============================================
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validation basique
+    if (!email.trim()) {
+      setError('Email requis');
+      return;
+    }
+    if (!password) {
+      setError('Mot de passe requis');
+      return;
+    }
+
     setIsLoading(true);
     setError('');
 
     try {
-      const response = await api.post<{ user: User }>('/auth/login', {
+      const response = await api.post<{ user: any }>('/auth/login', {
         email: email.trim().toLowerCase(),
         password,
       });
-      
-      if (response.data?.user) {
-        onSuccess(response.data.user);
-      }
+
+      onSuccess(response.data?.user);
     } catch (err) {
       if (err instanceof ApiError) {
-        if (err.code === 'EMAIL_NOT_VERIFIED') {
-          onNeedsVerification(email);
-        } else {
-          setError(err.message);
+        // Email non vérifié → rediriger vers vérification
+        if (err.message.includes('non vérifié') || err.code === 'EMAIL_NOT_VERIFIED') {
+          onNeedsVerification(email.trim().toLowerCase());
+          return;
         }
+        setError(err.message);
       } else {
         setError('Erreur de connexion');
       }
@@ -51,94 +67,159 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     }
   };
 
+  // ============================================
+  // RENDER
+  // ============================================
+
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-6">
-      {/* Logo */}
-      <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl flex items-center justify-center mb-6 shadow-lg">
-        <Ship className="w-8 h-8 text-white" />
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col">
+      
+      {/* Header */}
+      <div className="p-4 flex items-center gap-3">
+        <button
+          onClick={onBack}
+          className="p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 transition-colors"
+        >
+          <ArrowLeft size={20} />
+        </button>
+        <h1 className="text-white font-semibold">Connexion</h1>
       </div>
 
-      {/* Card */}
-      <div className="w-full max-w-sm bg-white rounded-2xl p-6 shadow-xl">
-        <h2 className="text-2xl font-bold text-slate-900 mb-2 text-center">Connexion</h2>
-        <p className="text-slate-500 text-sm mb-6 text-center">
-          Accédez à votre espace de gestion
-        </p>
-
-        {/* Error */}
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm flex items-center gap-2 animate-shake">
-            <AlertCircle size={18} />
-            {error}
-          </div>
-        )}
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="votre@email.com"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-3 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                required
-                autoComplete="email"
-              />
+      {/* Content */}
+      <div className="flex-1 flex flex-col items-center justify-center p-6">
+        <div className="w-full max-w-sm">
+          
+          {/* Logo */}
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-700 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/25">
+              <Zap size={32} className="text-white" fill="currentColor" />
             </div>
+            <h2 className="text-2xl font-bold text-white">Bienvenue</h2>
+            <p className="text-slate-400 text-sm mt-1">
+              Connectez-vous à votre compte
+            </p>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Mot de passe</label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-12 py-3 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                required
-                autoComplete="current-password"
-              />
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            
+            {/* Error */}
+            {error && (
+              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl flex items-center gap-2 text-red-400 text-sm animate-shake">
+                <AlertCircle size={18} className="flex-shrink-0" />
+                {error}
+              </div>
+            )}
+
+            {/* Email */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase mb-1.5">
+                Email
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-3.5 text-slate-500" size={18} />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => {
+                    setEmail(e.target.value);
+                    setError('');
+                  }}
+                  className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  placeholder="votre@email.com"
+                  autoComplete="email"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            {/* Password */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase mb-1.5">
+                Mot de passe
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-3.5 text-slate-500" size={18} />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => {
+                    setPassword(e.target.value);
+                    setError('');
+                  }}
+                  className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl pl-10 pr-12 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3.5 text-slate-500 hover:text-slate-300 transition-colors"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Forgot Password */}
+            <div className="text-right">
               <button
                 type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                className="text-sm text-slate-500 hover:text-blue-400 transition-colors"
+                onClick={() => {
+                  // TODO: Implement forgot password
+                  alert('Fonctionnalité à venir');
+                }}
               >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                Mot de passe oublié ?
               </button>
             </div>
+
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-semibold rounded-xl transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 size={20} className="animate-spin" />
+                  Connexion...
+                </>
+              ) : (
+                'Se connecter'
+              )}
+            </button>
+
+          </form>
+
+          {/* Divider */}
+          <div className="flex items-center gap-4 my-6">
+            <div className="flex-1 h-px bg-slate-700" />
+            <span className="text-slate-500 text-xs">OU</span>
+            <div className="flex-1 h-px bg-slate-700" />
           </div>
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 size={20} className="animate-spin" />
-                Connexion...
-              </>
-            ) : (
-              'Se connecter'
-            )}
-          </button>
-        </form>
+          {/* Register Link */}
+          <div className="text-center">
+            <p className="text-slate-500 text-sm">
+              Pas encore de compte ?
+            </p>
+            <button
+              onClick={onBack}
+              className="text-blue-400 font-medium hover:text-blue-300 transition-colors mt-1"
+            >
+              Créer mon entreprise
+            </button>
+          </div>
 
-        {/* Register Link */}
-        <p className="text-center text-sm text-slate-500 mt-6">
-          Pas encore de compte ?{' '}
-          <button
-            onClick={onRegister}
-            className="text-blue-600 font-semibold hover:underline"
-          >
-            S'inscrire
-          </button>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="p-6 text-center">
+        <p className="text-slate-600 text-xs">
+          © 2026 E-Trans · v3.0.0
         </p>
       </div>
     </div>
