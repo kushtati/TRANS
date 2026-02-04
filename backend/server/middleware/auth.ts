@@ -31,11 +31,24 @@ export const auth = async (req: Request, res: Response, next: NextFunction) => {
     const token = req.cookies?.accessToken || 
       req.headers.authorization?.replace('Bearer ', '');
 
+    // Debug logging
+    console.log('🔐 Auth middleware:', {
+      hasCookies: !!req.cookies,
+      cookieKeys: Object.keys(req.cookies || {}),
+      hasAccessToken: !!req.cookies?.accessToken,
+      hasAuthHeader: !!req.headers.authorization,
+      origin: req.headers.origin,
+    });
+
     if (!token) {
       return res.status(401).json({
         success: false,
         message: 'Authentification requise',
         code: 'NO_TOKEN',
+        debug: {
+          cookiesReceived: Object.keys(req.cookies || {}),
+          origin: req.headers.origin,
+        },
       });
     }
 

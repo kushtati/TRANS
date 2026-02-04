@@ -110,7 +110,32 @@ app.get('/api/health', async (req, res) => {
     });
   }
 });
-
+// Debug endpoint for cookies and CORS
+app.get('/api/debug', (req, res) => {
+  res.json({
+    success: true,
+    debug: {
+      environment: env.NODE_ENV,
+      frontendUrl: env.FRONTEND_URL,
+      origin: req.headers.origin,
+      cookies: {
+        received: Object.keys(req.cookies || {}),
+        accessToken: req.cookies?.accessToken ? 'present' : 'missing',
+        refreshToken: req.cookies?.refreshToken ? 'present' : 'missing',
+      },
+      headers: {
+        origin: req.headers.origin,
+        referer: req.headers.referer,
+        userAgent: req.headers['user-agent'],
+      },
+      corsAllowed: allowedOrigins.some(allowed => 
+        allowed instanceof RegExp 
+          ? allowed.test(req.headers.origin || '') 
+          : allowed === req.headers.origin
+      ),
+    },
+  });
+});
 // API Routes
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/shipments', shipmentRoutes);
