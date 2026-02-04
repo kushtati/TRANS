@@ -288,7 +288,7 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
           <div className="mt-6 text-center">
             <button
               onClick={onBack}
-              className="text-slate-500 text-sm hover:text-slate-300 transition-colors"
+              className="text-slate-400 text-sm hover:text-blue-400 transition-colors underline"
             >
               Modifier l'adresse email
             </button>
