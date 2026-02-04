@@ -8,7 +8,7 @@ import type { User } from './types';
 import { WelcomeScreen } from './components/auth/WelcomeScreen';
 import { LoginScreen } from './components/auth/LoginScreen';
 import { RegisterScreen } from './components/auth/RegisterScreen';
-import { VerifyScreen } from './components/auth/VerifyScreen';
+import { VerifyEmailScreen } from './components/auth/VerifyEmailScreen';
 
 // Layout
 import { AppLayout } from './components/layout/AppLayout';
@@ -106,7 +106,7 @@ export default function App() {
         );
       case 'verify':
         return (
-          <VerifyScreen
+          <VerifyEmailScreen
             email={pendingEmail}
             onSuccess={setUser}
             onBack={() => setAuthScreen('login')}
