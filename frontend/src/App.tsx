@@ -7,9 +7,9 @@ import type { User, Shipment, DashboardStats } from './types';
 // Icons
 import {
   Loader2, Ship, Package, Clock, CheckCircle2, AlertCircle,
-  Plus, Search, ChevronRight, Wallet, User as UserIcon,
-  LogOut, LayoutDashboard, PlusCircle, Calculator, Settings,
-  Menu, X, Bell, Building2, Eye, EyeOff, Mail, Lock, ArrowLeft
+  Plus, ChevronRight, Wallet,
+  LogOut, LayoutDashboard, PlusCircle, Settings,
+  Bell, Building2, Eye, EyeOff, Mail, Lock, ArrowLeft
 } from 'lucide-react';
 
 type View = 'dashboard' | 'create' | 'detail' | 'settings';
@@ -499,7 +499,7 @@ interface AppContainerProps {
   onLogout: () => void;
 }
 
-function AppContainer({ user, currentView, selectedShipmentId, onNavigate, onViewShipment, onLogout }: AppContainerProps) {
+function AppContainer({ user, currentView, selectedShipmentId: _selectedShipmentId, onNavigate, onViewShipment, onLogout }: AppContainerProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
