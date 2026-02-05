@@ -9,44 +9,49 @@ interface TokenPair {
 }
 
 export const setAuthCookies = (res: Response, tokens: TokenPair) => {
-  const cookieOptions = {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? 'none' as const : 'lax' as const,
-    path: '/',
-  };
-
-  // Add Partitioned attribute for cross-site cookies in Chrome
-  const partitionedCookieString = isProduction ? '; Partitioned' : '';
-
-  res.cookie('accessToken', tokens.accessToken, {
-    ...cookieOptions,
-    maxAge: 15 * 60 * 1000, // 15 minutes
-  });
+  // For cross-origin cookies between Vercel and Railway
+  // We need: Secure, SameSite=None, and manual Set-Cookie headers
   
-  // Manually add Partitioned header for modern browsers
   if (isProduction) {
-    const existingSetCookie = res.getHeader('Set-Cookie') as string[];
-    if (existingSetCookie && existingSetCookie.length > 0) {
-      res.setHeader('Set-Cookie', existingSetCookie.map(cookie => 
-        cookie.includes('accessToken') ? `${cookie}; Partitioned` : cookie
-      ));
-    }
-  }
-
-  res.cookie('refreshToken', tokens.refreshToken, {
-    ...cookieOptions,
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-  });
-  
-  // Manually add Partitioned header for refresh token
-  if (isProduction) {
-    const existingSetCookie = res.getHeader('Set-Cookie') as string[];
-    if (existingSetCookie && existingSetCookie.length > 0) {
-      res.setHeader('Set-Cookie', existingSetCookie.map(cookie => 
-        cookie.includes('refreshToken') ? `${cookie}; Partitioned` : cookie
-      ));
-    }
+    // Manual Set-Cookie headers with Partitioned for Chrome
+    const accessCookie = [
+      `accessToken=${tokens.accessToken}`,
+      'HttpOnly',
+      'Secure',
+      'SameSite=None',
+      'Path=/',
+      `Max-Age=${15 * 60}`, // 15 minutes
+      'Partitioned', // Required for Chrome cross-site cookies
+    ].join('; ');
+    
+    const refreshCookie = [
+      `refreshToken=${tokens.refreshToken}`,
+      'HttpOnly',
+      'Secure',
+      'SameSite=None',
+      'Path=/',
+      `Max-Age=${7 * 24 * 60 * 60}`, // 7 days
+      'Partitioned', // Required for Chrome cross-site cookies
+    ].join('; ');
+    
+    res.setHeader('Set-Cookie', [accessCookie, refreshCookie]);
+  } else {
+    // Development: use standard cookies
+    res.cookie('accessToken', tokens.accessToken, {
+      httpOnly: true,
+      secure: false,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 15 * 60 * 1000,
+    });
+    
+    res.cookie('refreshToken', tokens.refreshToken, {
+      httpOnly: true,
+      secure: false,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
   }
 };
 
