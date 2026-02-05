@@ -1,6 +1,6 @@
 {
   "name": "e-trans-frontend",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "type": "module",
   "private": true,
   "description": "E-Trans Frontend - React + Vite",
