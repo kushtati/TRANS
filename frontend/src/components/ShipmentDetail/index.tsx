@@ -12,6 +12,8 @@ import { ShipmentOverview } from './ShipmentOverview';
 import { ShipmentDocuments } from './ShipmentDocuments';
 import { ShipmentFinance } from './ShipmentFinance';
 import { ShipmentTimeline } from './ShipmentTimeline';
+import { ProgressTracker } from './ProgressTracker';
+import { NextSteps } from './NextSteps';
 
 interface ShipmentDetailProps {
   shipmentId: string;
@@ -200,8 +202,19 @@ export const ShipmentDetail: React.FC<ShipmentDetailProps> = ({ shipmentId, onBa
       </div>
 
       {/* Content */}
-      <div className="max-w-5xl mx-auto p-4">
-        {activeTab === 'overview' && <ShipmentOverview shipment={shipment} />}
+      <div className="max-w-5xl mx-auto p-4 space-y-4">
+        {/* Progress Tracker - always visible */}
+        {activeTab === 'overview' && (
+          <>
+            <ProgressTracker currentStatus={shipment.status} />
+            <NextSteps
+              shipmentId={shipmentId}
+              onNavigateToDocuments={() => setActiveTab('documents')}
+              onNavigateToFinance={() => setActiveTab('finance')}
+            />
+            <ShipmentOverview shipment={shipment} />
+          </>
+        )}
         {activeTab === 'documents' && <ShipmentDocuments shipment={shipment} onRefresh={loadShipment} />}
         {activeTab === 'finance' && <ShipmentFinance shipment={shipment} onRefresh={loadShipment} />}
         {activeTab === 'timeline' && <ShipmentTimeline shipment={shipment} />}

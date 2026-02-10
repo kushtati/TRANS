@@ -1,7 +1,7 @@
 // src/components/ShipmentDetail/ShipmentFinance.tsx
 
 import React, { useState, useMemo } from 'react';
-import { Plus, Wallet, CheckCircle2, Clock, Loader2, X, AlertCircle, AlertTriangle } from 'lucide-react';
+import { Plus, Wallet, CheckCircle2, Clock, Loader2, X, AlertCircle, AlertTriangle, Trash2 } from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
 import type { Shipment, ExpenseType, ExpenseCategory } from '../../types';
 
@@ -57,6 +57,7 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
   const [showAddModal, setShowAddModal] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const [payingId, setPayingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   const [newExpense, setNewExpense] = useState({
@@ -131,6 +132,18 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
       console.error(err);
     } finally {
       setPayingId(null);
+    }
+  };
+
+  const handleDeleteExpense = async (expenseId: string) => {
+    setDeletingId(expenseId);
+    try {
+      await api.delete(`/finance/expenses/${expenseId}`);
+      onRefresh();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -229,7 +242,9 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
                   key={expense.id}
                   expense={expense}
                   onMarkPaid={() => handleMarkPaid(expense.id)}
+                  onDelete={() => handleDeleteExpense(expense.id)}
                   isPaying={payingId === expense.id}
+                  isDeleting={deletingId === expense.id}
                 />
               ))}
             </div>
@@ -406,45 +421,176 @@ const SummaryCard: React.FC<{ label: string; amount: number; color: string; high
 const ExpenseRow: React.FC<{ 
   expense: Shipment['expenses'][0]; 
   onMarkPaid: () => void;
+  onDelete: () => void;
   isPaying: boolean;
-}> = ({ expense, onMarkPaid, isPaying }) => (
-  <div className="p-4 flex items-center justify-between">
-    <div className="flex-1">
-      <div className="flex items-center gap-2">
-        <span className="font-medium text-slate-900">{expense.description}</span>
-        {expense.paid ? (
-          <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-medium flex items-center gap-1">
-            <CheckCircle2 size={12} />
-            Payé
+  isDeleting: boolean;
+}> = ({ expense, onMarkPaid, onDelete, isPaying, isDeleting }) => {
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  return (
+    <>
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-medium text-slate-900 text-sm">{expense.description}</span>
+              {expense.paid ? (
+                <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-medium flex items-center gap-1 shrink-0">
+                  <CheckCircle2 size={12} />
+                  Payé
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs font-medium flex items-center gap-1 shrink-0">
+                  <Clock size={12} />
+                  En attente
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3 text-xs text-slate-500 mt-1 flex-wrap">
+              <span>{categoryLabels[expense.category]}</span>
+              {expense.reference && <span>Réf: {expense.reference}</span>}
+              {expense.paidAt && <span>Payé le {new Date(expense.paidAt).toLocaleDateString('fr-FR')}</span>}
+            </div>
+          </div>
+
+          <span className="font-semibold text-slate-900 text-sm whitespace-nowrap">
+            {expense.amount.toLocaleString('fr-FR')} GNF
           </span>
-        ) : (
-          <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs font-medium flex items-center gap-1">
-            <Clock size={12} />
-            En attente
-          </span>
-        )}
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex items-center gap-2 mt-3">
+          {!expense.paid && (
+            <button
+              onClick={() => setShowConfirm(true)}
+              disabled={isPaying}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 disabled:opacity-50 transition-colors"
+            >
+              {isPaying ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+              Payer
+            </button>
+          )}
+          {!expense.paid && (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={isDeleting}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 disabled:opacity-50 transition-colors"
+            >
+              {isDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+              Supprimer
+            </button>
+          )}
+          {expense.paid && (
+            <span className="text-xs text-green-600 flex items-center gap-1">
+              <CheckCircle2 size={14} />
+              Payé {expense.paidAt && `le ${new Date(expense.paidAt).toLocaleDateString('fr-FR')}`}
+            </span>
+          )}
+        </div>
       </div>
-      <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
-        <span>{categoryLabels[expense.category]}</span>
-        {expense.reference && <span>Réf: {expense.reference}</span>}
-        {expense.paidAt && <span>Payé le {new Date(expense.paidAt).toLocaleDateString('fr-FR')}</span>}
-      </div>
-    </div>
-    
-    <div className="flex items-center gap-2">
-      <span className="font-semibold text-slate-900">{expense.amount.toLocaleString('fr-FR')} GNF</span>
-      {!expense.paid && (
-        <button
-          onClick={onMarkPaid}
-          disabled={isPaying}
-          className="p-2 text-green-600 hover:bg-green-50 rounded-lg disabled:opacity-50"
-          title="Marquer comme payé"
-        >
-          {isPaying ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
-        </button>
+
+      {/* Confirmation paiement */}
+      {showConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowConfirm(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
+            <div className="text-center mb-4">
+              <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Wallet size={24} className="text-green-600" />
+              </div>
+              <h3 className="font-semibold text-lg text-slate-900">Confirmer le paiement</h3>
+              <p className="text-sm text-slate-500 mt-1">
+                Voulez-vous confirmer le paiement de ce débours ?
+              </p>
+            </div>
+
+            <div className="bg-slate-50 rounded-xl p-3 mb-4 space-y-1">
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Description</span>
+                <span className="font-medium text-slate-800">{expense.description}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Catégorie</span>
+                <span className="text-slate-700">{categoryLabels[expense.category]}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Montant</span>
+                <span className="font-bold text-green-700">{expense.amount.toLocaleString('fr-FR')} GNF</span>
+              </div>
+              {expense.reference && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">Référence</span>
+                  <span className="text-slate-700">{expense.reference}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowConfirm(false)}
+                className="flex-1 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-medium text-sm hover:bg-slate-200 transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => {
+                  setShowConfirm(false);
+                  onMarkPaid();
+                }}
+                disabled={isPaying}
+                className="flex-1 py-2.5 bg-green-600 text-white rounded-xl font-medium text-sm hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
+              >
+                {isPaying ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                Confirmer
+              </button>
+            </div>
+          </div>
+        </div>
       )}
-    </div>
-  </div>
-);
+
+      {/* Confirmation suppression */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
+            <div className="text-center mb-4">
+              <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <AlertTriangle size={24} className="text-red-600" />
+              </div>
+              <h3 className="font-semibold text-lg text-slate-900">Supprimer le débours</h3>
+              <p className="text-sm text-slate-500 mt-1">
+                Cette action est irréversible.
+              </p>
+            </div>
+
+            <div className="bg-red-50 rounded-xl p-3 mb-4 text-center">
+              <p className="text-sm font-medium text-red-800">{expense.description}</p>
+              <p className="text-lg font-bold text-red-700 mt-1">{expense.amount.toLocaleString('fr-FR')} GNF</p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-medium text-sm hover:bg-slate-200 transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  onDelete();
+                }}
+                disabled={isDeleting}
+                className="flex-1 py-2.5 bg-red-600 text-white rounded-xl font-medium text-sm hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
+              >
+                {isDeleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                Supprimer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
 
 export default ShipmentFinance;

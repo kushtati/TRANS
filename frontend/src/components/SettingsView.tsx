@@ -136,7 +136,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ user, onLogout, onNa
         Déconnexion
       </button>
 
-      <p className="text-center text-xs text-slate-400">E-Trans v2.2.0</p>
+      <p className="text-center text-xs text-slate-400">E-Trans v3.0.0</p>
     </div>
   );
 };

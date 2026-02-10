@@ -104,7 +104,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onRegiste
           © 2026 E-Trans · Tous droits réservés
         </p>
         <p className="text-slate-700 text-[10px] mt-1">
-          v2.2.0
+          v3.0.0
         </p>
       </div>
 

@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/prisma.js';
 import { log } from '../config/logger.js';
-import { auth, requireRole } from '../middleware/auth.js';
+import { autoAdvanceStatus, generateAlerts, getNextSteps, DOCUMENT_FIELD_HINTS } from '../services/workflow.service.js';
 import {
   createShipmentSchema,
   updateShipmentSchema,
@@ -14,6 +14,7 @@ import {
   updateStatusSchema,
 } from '../validators/shipment.validators.js';
 import { generateTrackingNumber } from '../utils/tracking.js';
+import { auth, requireRole } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -155,46 +156,32 @@ router.get('/stats', async (req: Request, res: Response) => {
       take: 5,
     });
 
-    // Alerts
-    const alerts: Array<{ id: string; type: string; message: string; shipmentId?: string }> = [];
+    // Smart alerts from workflow engine
+    const workflowAlerts = await generateAlerts(companyId);
 
-    // Alert: shipments stuck in PENDING for > 3 days
-    const stuckPending = await prisma.shipment.findMany({
-      where: {
-        companyId,
-        status: 'PENDING',
-        createdAt: { lt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) },
-      },
-      select: { id: true, trackingNumber: true, clientName: true },
-      take: 5,
-    });
+    // Add basic finance alerts
+    const alerts: Array<{ id: string; type: string; message: string; shipmentId?: string; category?: string }> = [];
 
-    stuckPending.forEach(s => {
-      alerts.push({
-        id: `stuck-${s.id}`,
-        type: 'warning',
-        message: `${s.trackingNumber} (${s.clientName}) en attente depuis +3 jours`,
-        shipmentId: s.id,
-      });
-    });
-
-    // Alert: negative balance
     if (totalProvisions - totalDisbursements < 0) {
       alerts.push({
         id: 'negative-balance',
         type: 'danger',
+        category: 'finance',
         message: `Solde global négatif : ${Math.round(totalProvisions - totalDisbursements).toLocaleString('fr-FR')} GNF`,
       });
     }
 
-    // Alert: high unpaid
-    if (unpaid > 0) {
-      alerts.push({
-        id: 'unpaid-disbursements',
-        type: 'warning',
-        message: `${Math.round(unpaid).toLocaleString('fr-FR')} GNF de débours en attente`,
-      });
-    }
+    // Merge workflow alerts (vessel, document, deadline) + finance alerts
+    const allAlerts = [
+      ...alerts,
+      ...workflowAlerts.map(a => ({
+        id: a.id,
+        type: a.type,
+        message: a.message,
+        shipmentId: a.shipmentId,
+        category: a.category,
+      })),
+    ];
 
     res.json({
       success: true,
@@ -214,7 +201,7 @@ router.get('/stats', async (req: Request, res: Response) => {
             delivered: containersDelivered,
           },
           recentShipments,
-          alerts,
+          alerts: allAlerts,
         },
       },
     });
@@ -325,6 +312,32 @@ router.get('/:id', async (req: Request, res: Response) => {
   } catch (error) {
     log.error('Get shipment error', error);
     res.status(500).json({ success: false, message: 'Erreur lors du chargement du dossier' });
+  }
+});
+
+// ============================================
+// GET /api/shipments/:id/next-steps
+// ============================================
+
+router.get('/:id/next-steps', async (req: Request, res: Response) => {
+  try {
+    const shipment = await prisma.shipment.findFirst({
+      where: { id: req.params.id, companyId: req.user!.companyId },
+      include: {
+        documents: { select: { type: true } },
+        expenses: { select: { type: true, paid: true } },
+      },
+    });
+
+    if (!shipment) {
+      return res.status(404).json({ success: false, message: 'Dossier non trouvé' });
+    }
+
+    const steps = getNextSteps(shipment);
+
+    res.json({ success: true, data: { steps } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
 
@@ -644,7 +657,13 @@ router.post('/:id/documents', async (req: Request, res: Response) => {
 
     res.status(201).json({
       success: true,
-      data: { document },
+      data: {
+        document,
+        // Auto-advance status if this document triggers a progression
+        statusAdvanced: await autoAdvanceStatus(shipment.id, data.type, req.user!.id),
+        // Hint which fields the user should fill from this document
+        fieldHints: DOCUMENT_FIELD_HINTS[data.type] || null,
+      },
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

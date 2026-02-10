@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Ship, Package, Clock, CheckCircle2, AlertTriangle,
   TrendingUp, TrendingDown, Plus, Search, RefreshCw,
-  ChevronRight, Anchor, FileText, Wallet
+  ChevronRight, Anchor, FileText, Wallet, DollarSign
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useDebounce } from '../hooks/useDebounce';
@@ -197,31 +197,53 @@ export const Dashboard: React.FC<DashboardProps> = ({
         />
       </div>
 
-      {/* Alerts */}
+      {/* Smart Alerts — vessel, document, finance, deadline */}
       {stats?.alerts && stats.alerts.length > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-          <div className="flex items-center gap-2 text-amber-700 mb-2">
-            <AlertTriangle size={18} />
-            <span className="font-medium">Alertes ({stats.alerts.length})</span>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-slate-700 px-1">
+            <AlertTriangle size={16} />
+            <span className="font-medium text-sm">Alertes ({stats.alerts.length})</span>
           </div>
-          <div className="space-y-2">
-            {stats.alerts.slice(0, 3).map((alert) => (
+          {stats.alerts.slice(0, 8).map((alert) => {
+            const colors: Record<string, string> = {
+              danger: 'bg-red-50 border-red-200',
+              warning: 'bg-amber-50 border-amber-200',
+              info: 'bg-blue-50 border-blue-200',
+            };
+            const textColors: Record<string, string> = {
+              danger: 'text-red-800',
+              warning: 'text-amber-800',
+              info: 'text-blue-800',
+            };
+            const icons: Record<string, React.ReactNode> = {
+              vessel: <Ship size={14} />,
+              document: <FileText size={14} />,
+              finance: <DollarSign size={14} />,
+              deadline: <Clock size={14} />,
+            };
+
+            return (
               <div
                 key={alert.id}
-                className="flex items-center justify-between p-2 bg-white rounded-lg"
+                className={`flex items-center gap-3 p-3 rounded-xl border ${colors[alert.type] || colors.info}`}
               >
-                <span className="text-sm text-slate-700">{alert.message}</span>
+                <div className={`shrink-0 ${textColors[alert.type] || textColors.info}`}>
+                  {icons[(alert as any).category] || <AlertTriangle size={14} />}
+                </div>
+                <span className={`text-sm flex-1 ${textColors[alert.type] || textColors.info}`}>
+                  {alert.message}
+                </span>
                 {alert.shipmentId && (
                   <button
                     onClick={() => onViewShipment(alert.shipmentId!)}
-                    className="text-xs text-blue-600 hover:underline"
+                    className="text-xs text-blue-600 hover:underline font-medium shrink-0"
                   >
                     Voir
                   </button>
                 )}
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
       )}
 

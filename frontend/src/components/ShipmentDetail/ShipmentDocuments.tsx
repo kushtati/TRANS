@@ -50,7 +50,20 @@ export const ShipmentDocuments: React.FC<ShipmentDocumentsProps> = ({ shipment, 
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [uploadMode, setUploadMode] = useState<'file' | 'url'>('file');
+  const [autoAdvanceMsg, setAutoAdvanceMsg] = useState('');
+  const [fieldHintMsg, setFieldHintMsg] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const formatStatus = (s: string) => {
+    const map: Record<string, string> = {
+      PENDING: 'En cours', ARRIVED: 'Arrivé', DDI_OBTAINED: 'DDI obtenu',
+      DECLARATION_FILED: 'Déclaration déposée', LIQUIDATION_ISSUED: 'Liquidation émise',
+      CUSTOMS_PAID: 'Droits payés', BAE_ISSUED: 'BAE émis', TERMINAL_PAID: 'Terminal payé',
+      DO_RELEASED: 'DO libéré', EXIT_NOTE_ISSUED: 'Bon de sortie', IN_DELIVERY: 'En livraison',
+      DELIVERED: 'Livré',
+    };
+    return map[s] || s;
+  };
 
   const [newDoc, setNewDoc] = useState({
     type: 'OTHER' as DocumentType,
@@ -120,7 +133,11 @@ export const ShipmentDocuments: React.FC<ShipmentDocumentsProps> = ({ shipment, 
         setIsUploading(false);
       }
 
-      await api.post(`/shipments/${shipment.id}/documents`, {
+      const res = await api.post<{
+        document: any;
+        statusAdvanced?: { advanced: boolean; newStatus?: string; oldStatus?: string };
+        fieldHints?: { fields: string[]; label: string } | null;
+      }>(`/shipments/${shipment.id}/documents`, {
         type: newDoc.type,
         name: newDoc.name.trim(),
         url: fileUrl,
@@ -130,6 +147,19 @@ export const ShipmentDocuments: React.FC<ShipmentDocumentsProps> = ({ shipment, 
       setShowAddModal(false);
       setNewDoc({ type: 'OTHER', name: '', url: '', reference: '', file: null });
       if (fileInputRef.current) fileInputRef.current.value = '';
+
+      // Show auto-advance notification
+      if (res.data?.statusAdvanced?.advanced) {
+        setAutoAdvanceMsg(`✅ Statut avancé automatiquement → ${formatStatus(res.data.statusAdvanced.newStatus || '')}`);
+        setTimeout(() => setAutoAdvanceMsg(''), 5000);
+      }
+
+      // Show field hints if document type has extractable fields
+      if (res.data?.fieldHints) {
+        setFieldHintMsg(`💡 Document "${res.data.fieldHints.label}" ajouté. Pensez à remplir : ${res.data.fieldHints.fields.slice(0, 4).join(', ')}...`);
+        setTimeout(() => setFieldHintMsg(''), 8000);
+      }
+
       onRefresh();
     } catch (err) {
       setIsUploading(false);
@@ -162,6 +192,20 @@ export const ShipmentDocuments: React.FC<ShipmentDocumentsProps> = ({ shipment, 
 
   return (
     <div className="space-y-4">
+      {/* Auto-advance notification */}
+      {autoAdvanceMsg && (
+        <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800 font-medium animate-fade-in">
+          {autoAdvanceMsg}
+        </div>
+      )}
+
+      {/* Field hints notification */}
+      {fieldHintMsg && (
+        <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800 animate-fade-in">
+          {fieldHintMsg}
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="font-medium text-slate-900">
