@@ -161,7 +161,7 @@ router.get('/shipment/:id/pdf', async (req: Request, res: Response) => {
     doc.moveDown(0.3);
     doc.fontSize(8).fillColor('#999');
     doc.text(
-      `Généré le ${new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })} — E-Trans v2.2`,
+      `Généré le ${new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })} — E-Trans v3.0`,
       { align: 'center' }
     );
     doc.text(`Par : ${shipment.createdBy?.name || 'Système'}`, { align: 'center' });
@@ -261,7 +261,7 @@ router.get('/finance/summary/pdf', async (req: Request, res: Response) => {
     doc.moveDown(2);
     doc.fontSize(8).fillColor('#999');
     doc.text(
-      `Généré le ${new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })} — E-Trans v2.2`,
+      `Généré le ${new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })} — E-Trans v3.0`,
       { align: 'center' }
     );
 
