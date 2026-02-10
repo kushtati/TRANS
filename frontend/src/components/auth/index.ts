@@ -3,4 +3,5 @@
 export { WelcomeScreen } from './WelcomeScreen';
 export { LoginScreen } from './LoginScreen';
 export { RegisterScreen } from './RegisterScreen';
-export { VerifyScreen } from './VerifyScreen';
+export { VerifyEmailScreen } from './VerifyEmailScreen';
+export { ForgotPasswordScreen } from './ForgotPasswordScreen';

@@ -78,7 +78,7 @@ Railway vous donnera une URL automatique comme : `https://your-app.up.railway.ap
 
 ### Étape 6 : Déploiement
 
-Railway détectera automatiquement votre `nixpacks.toml` et `railway.toml` et :
+Railway détectera automatiquement votre `nixpacks.toml` et `railway.json` et :
 - Installera les dépendances
 - Construira le projet TypeScript
 - Exécutera les migrations Prisma
@@ -196,7 +196,7 @@ curl https://your-backend.railway.app/api/auth/me
 - Vérifiez les CORS dans le backend
 
 ### Erreurs CORS
-Dans [backend/server/index.ts](backend/server/index.ts), assurez-vous que CORS est configuré avec votre URL Vercel :
+Dans [backend/src/index.ts](backend/src/index.ts), assurez-vous que CORS est configuré avec votre URL Vercel :
 ```typescript
 app.use(cors({
   origin: env.FRONTEND_URL,

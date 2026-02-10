@@ -1,7 +1,7 @@
 // src/components/ShipmentDetail/ShipmentDocuments.tsx
 
-import React, { useState } from 'react';
-import { Plus, FileText, Download, Trash2, Eye, Loader2, X, AlertCircle } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Plus, FileText, Download, Trash2, Eye, Loader2, X, AlertCircle, Upload, Link2 } from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
 import type { Shipment, DocumentType } from '../../types';
 
@@ -46,19 +46,64 @@ const documentTypeColors: Record<string, string> = {
 export const ShipmentDocuments: React.FC<ShipmentDocumentsProps> = ({ shipment, onRefresh }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [uploadMode, setUploadMode] = useState<'file' | 'url'>('file');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [newDoc, setNewDoc] = useState({
     type: 'OTHER' as DocumentType,
     name: '',
     url: '',
     reference: '',
+    file: null as File | null,
   });
 
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setNewDoc(prev => ({
+      ...prev,
+      file,
+      name: prev.name || file.name.replace(/\.[^.]+$/, ''),
+    }));
+  };
+
+  const uploadFile = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await fetch(
+      `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/upload`,
+      {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      }
+    );
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Erreur upload');
+    }
+
+    const data = await res.json();
+    return data.data.url;
+  };
+
   const handleAddDocument = async () => {
-    if (!newDoc.name.trim() || !newDoc.url.trim()) {
-      setError('Nom et URL requis');
+    if (!newDoc.name.trim()) {
+      setError('Nom du document requis');
+      return;
+    }
+    if (uploadMode === 'url' && !newDoc.url.trim()) {
+      setError('URL du fichier requise');
+      return;
+    }
+    if (uploadMode === 'file' && !newDoc.file) {
+      setError('Sélectionnez un fichier');
       return;
     }
 
@@ -66,18 +111,31 @@ export const ShipmentDocuments: React.FC<ShipmentDocumentsProps> = ({ shipment, 
     setError('');
 
     try {
+      let fileUrl = newDoc.url.trim();
+
+      // Upload file first if in file mode
+      if (uploadMode === 'file' && newDoc.file) {
+        setIsUploading(true);
+        fileUrl = await uploadFile(newDoc.file);
+        setIsUploading(false);
+      }
+
       await api.post(`/shipments/${shipment.id}/documents`, {
         type: newDoc.type,
         name: newDoc.name.trim(),
-        url: newDoc.url.trim(),
+        url: fileUrl,
         reference: newDoc.reference.trim() || undefined,
       });
       
       setShowAddModal(false);
-      setNewDoc({ type: 'OTHER', name: '', url: '', reference: '' });
+      setNewDoc({ type: 'OTHER', name: '', url: '', reference: '', file: null });
+      if (fileInputRef.current) fileInputRef.current.value = '';
       onRefresh();
     } catch (err) {
+      setIsUploading(false);
       if (err instanceof ApiError) {
+        setError(err.message);
+      } else if (err instanceof Error) {
         setError(err.message);
       }
     } finally {
@@ -217,19 +275,83 @@ export const ShipmentDocuments: React.FC<ShipmentDocumentsProps> = ({ shipment, 
                   value={newDoc.name}
                   onChange={(e) => setNewDoc(prev => ({ ...prev, name: e.target.value }))}
                   placeholder="Ex: BL MEDU09243710"
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2.5"
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm"
                 />
               </div>
 
+              {/* Upload mode toggle */}
               <div>
-                <label className="block text-sm text-slate-600 mb-1">URL du fichier *</label>
-                <input
-                  type="url"
-                  value={newDoc.url}
-                  onChange={(e) => setNewDoc(prev => ({ ...prev, url: e.target.value }))}
-                  placeholder="https://..."
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2.5"
-                />
+                <div className="flex gap-2 mb-2">
+                  <button
+                    type="button"
+                    onClick={() => setUploadMode('file')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      uploadMode === 'file'
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    <Upload size={14} />
+                    Fichier
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUploadMode('url')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      uploadMode === 'url'
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    <Link2 size={14} />
+                    URL
+                  </button>
+                </div>
+
+                {uploadMode === 'file' ? (
+                  <div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                      id="doc-upload"
+                    />
+                    <label
+                      htmlFor="doc-upload"
+                      className="block w-full border-2 border-dashed border-slate-300 rounded-lg p-4 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition-colors"
+                    >
+                      {newDoc.file ? (
+                        <div className="flex items-center gap-2 justify-center">
+                          <FileText size={18} className="text-blue-500" />
+                          <span className="text-sm text-slate-700 font-medium">{newDoc.file.name}</span>
+                          <span className="text-xs text-slate-400">
+                            ({(newDoc.file.size / 1024).toFixed(0)} Ko)
+                          </span>
+                        </div>
+                      ) : (
+                        <div>
+                          <Upload size={24} className="text-slate-400 mx-auto mb-1" />
+                          <span className="text-sm text-slate-500">
+                            Cliquez pour choisir un fichier
+                          </span>
+                          <p className="text-xs text-slate-400 mt-1">
+                            PDF, images, Word, Excel — max 10 Mo
+                          </p>
+                        </div>
+                      )}
+                    </label>
+                  </div>
+                ) : (
+                  <input
+                    type="url"
+                    value={newDoc.url}
+                    onChange={(e) => setNewDoc(prev => ({ ...prev, url: e.target.value }))}
+                    placeholder="https://..."
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm"
+                  />
+                )}
               </div>
 
               <div>
@@ -257,7 +379,7 @@ export const ShipmentDocuments: React.FC<ShipmentDocumentsProps> = ({ shipment, 
                 className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-medium disabled:opacity-60 flex items-center justify-center gap-2"
               >
                 {isAdding && <Loader2 size={18} className="animate-spin" />}
-                Ajouter
+                {isUploading ? 'Téléchargement...' : 'Ajouter'}
               </button>
             </div>
           </div>

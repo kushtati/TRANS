@@ -72,27 +72,35 @@
 ```
 backend/
 ├── prisma/
-│   ├── schema.prisma      # Modèles de données
-│   └── seed.ts            # Données initiales
-├── server/
-│   ├── index.ts           # Point d'entrée
+│   └── schema.prisma      # Modèles de données (10 modèles)
+├── src/
+│   ├── index.ts           # Point d'entrée Express
+│   ├── seed.ts            # Données initiales
 │   ├── config/
 │   │   ├── env.ts         # Variables d'environnement
 │   │   ├── logger.ts      # Système de logs
 │   │   └── prisma.ts      # Client Prisma
 │   ├── middleware/
-│   │   └── auth.ts        # Auth JWT middleware
+│   │   └── auth.ts        # Auth JWT + RBAC
 │   ├── routes/
 │   │   ├── auth.ts        # Routes authentification
 │   │   ├── shipments.ts   # Routes expéditions
 │   │   ├── finance.ts     # Routes finances
-│   │   └── ai.ts          # Routes IA
+│   │   ├── ai.ts          # Routes IA
+│   │   ├── audit.ts       # Routes audit
+│   │   ├── export.ts      # Routes export PDF
+│   │   ├── upload.ts      # Routes upload fichiers
+│   │   └── user.ts        # Routes profil utilisateur
 │   ├── services/
-│   │   └── email.service.ts  # Service emails
-│   └── utils/
-│       └── cookies.ts     # Helpers cookies
-├── railway.toml           # Config Railway
-├── nixpacks.toml          # Config build
+│   │   ├── email.service.ts   # Service emails (Resend)
+│   │   └── cleanup.service.ts # Service nettoyage
+│   ├── utils/
+│   │   ├── cookies.ts     # Helpers cookies auth
+│   │   └── tracking.ts    # Génération tracking numbers
+│   ├── validators/        # Schémas Zod
+│   └── types/             # Types TypeScript
+├── tests/                 # Tests Vitest
+├── nixpacks.toml          # Config build Railway
 ├── package.json
 └── tsconfig.json
 ```
@@ -103,10 +111,17 @@ frontend/
 ├── src/
 │   ├── main.tsx           # Point d'entrée
 │   ├── App.tsx            # Composant principal
+│   ├── components/        # Composants React
+│   ├── contexts/          # AuthContext, ThemeContext
+│   ├── hooks/             # Hooks personnalisés
 │   ├── lib/
 │   │   └── api.ts         # Client API
-│   └── types/
-│       └── index.ts       # Types TypeScript
+│   ├── pages/             # Pages/Vues
+│   ├── types/
+│   │   └── index.ts       # Types TypeScript
+│   └── utils/
+│       └── format.ts      # Helpers formatage (GNF)
+├── public/                # Assets statiques
 ├── vercel.json            # Config Vercel
 ├── vite.config.ts         # Config Vite
 ├── tailwind.config.js     # Config TailwindCSS

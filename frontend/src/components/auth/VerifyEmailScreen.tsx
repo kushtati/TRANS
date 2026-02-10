@@ -3,11 +3,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Mail, ArrowLeft, Loader2, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
+import type { User } from '../../types';
 
 interface VerifyEmailScreenProps {
   email: string;
   onBack: () => void;
-  onSuccess: (user: any) => void;
+  onSuccess: (user: User) => void;
 }
 
 export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({ 
@@ -93,7 +94,7 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
     setError('');
 
     try {
-      const response = await api.post<{ user: any }>('/auth/verify-email', {
+      const response = await api.post<{ user: User }>('/auth/verify-email', {
         email,
         code: verificationCode,
       });

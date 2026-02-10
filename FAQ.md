@@ -63,7 +63,7 @@ openssl rand -hex 32
 1. **Port incorrect**: Assurez-vous d'utiliser `process.env.PORT`
 2. **Database connexion**: Vérifiez `DATABASE_URL`
 3. **Build échoué**: Consultez les logs Railway
-4. **Timeout**: Augmentez `healthcheckTimeout` dans `railway.toml`
+4. **Timeout**: Vérifiez la configuration dans `railway.json`
 
 ### Q: CORS errors après déploiement
 
@@ -458,4 +458,10 @@ npm run dev
 ---
 
 **Vous ne trouvez pas votre réponse ?**
-Consultez [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) ou créez une Issue GitHub ! 🚀
+
+Consultez également :
+- **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)** - Guide de déploiement
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Architecture technique
+- **[COMMANDS.md](COMMANDS.md)** - Référence des commandes
+
+Ou créez une Issue GitHub ! 🚀

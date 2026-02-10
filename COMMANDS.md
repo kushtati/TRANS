@@ -362,9 +362,9 @@ vercel promote <deployment-url>
 
 ## 📚 Documentation
 
-- **Guide complet**: [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)
-- **Quick Start**: [DEPLOYMENT_QUICK_START.md](DEPLOYMENT_QUICK_START.md)
-- **Checklist**: [DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md)
+- **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)** - Guide de déploiement
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Architecture technique
+- **[FAQ.md](FAQ.md)** - Questions fréquentes
 - **Railway Docs**: https://docs.railway.app
 - **Vercel Docs**: https://vercel.com/docs
 - **Prisma Docs**: https://prisma.io/docs

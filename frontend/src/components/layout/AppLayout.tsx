@@ -1,22 +1,12 @@
 // src/components/layout/AppLayout.tsx
 
-import React, { useState } from 'react';
-import { 
-  Zap, Search, Bell, LogOut, User, Menu, X,
-  LayoutDashboard, PlusCircle, Calculator, 
-  PieChart, Settings, MessageSquare
+import React, { useState, useCallback } from 'react';
+import {
+  Zap, Search, Bell, LogOut, User as UserIcon, Menu, X,
+  LayoutDashboard, PlusCircle, Calculator,
+  PieChart, Settings, MessageSquare,
 } from 'lucide-react';
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  company: {
-    id: string;
-    name: string;
-  };
-}
+import type { User, Role } from '../../types';
 
 type AppView = 'dashboard' | 'shipment' | 'create' | 'accounting' | 'calculator' | 'settings' | 'assistant' | 'detail';
 
@@ -25,7 +15,15 @@ interface AppLayoutProps {
   currentView: AppView;
   onNavigate: (view: AppView) => void;
   onLogout: () => void;
+  onSearch?: (query: string) => void;
   children: React.ReactNode;
+}
+
+interface NavItem {
+  id: AppView;
+  label: string;
+  icon: React.FC<{ size?: number; strokeWidth?: number }>;
+  roles?: Role[];
 }
 
 export const AppLayout: React.FC<AppLayoutProps> = ({
@@ -33,53 +31,55 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   currentView,
   onNavigate,
   onLogout,
+  onSearch,
   children,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
-  // ============================================
-  // NAVIGATION ITEMS
-  // ============================================
+  const handleSearch = useCallback((value: string) => {
+    setSearchQuery(value);
+    onSearch?.(value);
+  }, [onSearch]);
 
-  const navItems = [
+  const handleSearchSubmit = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    onSearch?.(searchQuery);
+  }, [onSearch, searchQuery]);
+
+  const navItems: NavItem[] = [
     { id: 'dashboard', label: 'Accueil', icon: LayoutDashboard },
     { id: 'create', label: 'Nouveau', icon: PlusCircle },
     { id: 'calculator', label: 'Calcul', icon: Calculator },
     { id: 'accounting', label: 'Finance', icon: PieChart, roles: ['DIRECTOR', 'ACCOUNTANT'] },
     { id: 'assistant', label: 'IA', icon: MessageSquare },
-  ].filter(item => !item.roles || item.roles.includes(user.role));
+  ];
 
-  // ============================================
-  // ROLE LABELS
-  // ============================================
+  const visibleNavItems = navItems.filter(
+    item => !item.roles || item.roles.includes(user.role)
+  );
 
-  const roleLabels: Record<string, string> = {
+  const roleLabels: Record<Role, string> = {
     DIRECTOR: 'Directeur',
     ACCOUNTANT: 'Comptable',
     AGENT: 'Agent',
     CLIENT: 'Client',
   };
 
-  // ============================================
-  // RENDER
-  // ============================================
-
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col">
-      
-      {/* ============================================ */}
+
       {/* HEADER */}
-      {/* ============================================ */}
-      
       <header className="bg-slate-900 text-white sticky top-0 z-50 shadow-lg">
-        {/* Top Bar */}
         <div className="px-4 py-3">
           <div className="flex items-center justify-between gap-4">
-            
+
             {/* Logo */}
-            <div className="flex items-center gap-2">
+            <div
+              className="flex items-center gap-2 cursor-pointer"
+              onClick={() => onNavigate('dashboard')}
+            >
               <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
                 <Zap size={18} fill="currentColor" />
               </div>
@@ -92,26 +92,28 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
             </div>
 
             {/* Search (desktop) */}
-            <div className="flex-1 max-w-md hidden md:block">
+            <form onSubmit={handleSearchSubmit} className="flex-1 max-w-md hidden md:block">
               <div className="relative">
                 <Search className="absolute left-3 top-2.5 text-slate-400" size={18} />
                 <input
                   type="text"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => handleSearch(e.target.value)}
                   placeholder="Rechercher (BL, tracking, client...)"
                   className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-500"
                 />
               </div>
-            </div>
+            </form>
 
             {/* Right Actions */}
             <div className="flex items-center gap-2">
-              
+
               {/* Notifications */}
-              <button className="relative p-2 rounded-lg hover:bg-slate-800 transition-colors">
+              <button
+                className="relative p-2 rounded-lg hover:bg-slate-800 transition-colors"
+                title="Notifications (bientôt)"
+              >
                 <Bell size={20} />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
               </button>
 
               {/* User Menu */}
@@ -121,20 +123,19 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                   className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-800 transition-colors"
                 >
                   <div className="w-8 h-8 bg-slate-700 rounded-full flex items-center justify-center">
-                    <User size={16} />
+                    <UserIcon size={16} />
                   </div>
                   <div className="hidden sm:block text-left">
                     <p className="text-sm font-medium leading-tight">{user.name.split(' ')[0]}</p>
-                    <p className="text-xs text-slate-400">{roleLabels[user.role] || user.role}</p>
+                    <p className="text-xs text-slate-400">{roleLabels[user.role]}</p>
                   </div>
                 </button>
 
-                {/* Dropdown */}
                 {showUserMenu && (
                   <>
-                    <div 
-                      className="fixed inset-0 z-10" 
-                      onClick={() => setShowUserMenu(false)} 
+                    <div
+                      className="fixed inset-0 z-10"
+                      onClick={() => setShowUserMenu(false)}
                     />
                     <div className="absolute right-0 top-full mt-2 w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-20 overflow-hidden">
                       <div className="p-3 border-b border-slate-700">
@@ -180,29 +181,29 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
           </div>
 
           {/* Search (mobile) */}
-          <div className="mt-3 md:hidden">
+          <form onSubmit={handleSearchSubmit} className="mt-3 md:hidden">
             <div className="relative">
               <Search className="absolute left-3 top-2.5 text-slate-400" size={18} />
               <input
                 type="text"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => handleSearch(e.target.value)}
                 placeholder="Rechercher..."
                 className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-          </div>
+          </form>
         </div>
 
         {/* Mobile Navigation */}
         {showMobileMenu && (
           <nav className="px-4 pb-3 md:hidden border-t border-slate-800">
             <div className="flex flex-wrap gap-2 pt-3">
-              {navItems.map(item => (
+              {visibleNavItems.map(item => (
                 <button
                   key={item.id}
                   onClick={() => {
-                    onNavigate(item.id as AppView);
+                    onNavigate(item.id);
                     setShowMobileMenu(false);
                   }}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
@@ -220,24 +221,18 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
         )}
       </header>
 
-      {/* ============================================ */}
       {/* MAIN CONTENT */}
-      {/* ============================================ */}
-      
       <main className="flex-1 pb-20 md:pb-6">
         {children}
       </main>
 
-      {/* ============================================ */}
       {/* BOTTOM NAVIGATION (Mobile) */}
-      {/* ============================================ */}
-      
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 md:hidden z-40">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 md:hidden z-40 pb-[env(safe-area-inset-bottom)]">
         <div className="flex justify-around items-center px-2 py-2">
-          {navItems.slice(0, 5).map(item => (
+          {visibleNavItems.slice(0, 5).map(item => (
             <button
               key={item.id}
-              onClick={() => onNavigate(item.id as AppView)}
+              onClick={() => onNavigate(item.id)}
               className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg transition-colors min-w-[60px] ${
                 currentView === item.id
                   ? 'text-blue-600'
@@ -250,11 +245,6 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
           ))}
         </div>
       </nav>
-
-      {/* ============================================ */}
-      {/* DESKTOP SIDEBAR (Optional - can be added) */}
-      {/* ============================================ */}
-      
     </div>
   );
 };

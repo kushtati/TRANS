@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  ArrowLeft, RefreshCw, Edit, Loader2,
+  ArrowLeft, RefreshCw, Edit, Loader2, Download,
   Ship, Package, FileText, Wallet, Clock, CheckCircle2,
   AlertCircle, Anchor
 } from 'lucide-react';
@@ -16,11 +16,12 @@ import { ShipmentTimeline } from './ShipmentTimeline';
 interface ShipmentDetailProps {
   shipmentId: string;
   onBack: () => void;
+  onEdit?: () => void;
 }
 
 type Tab = 'overview' | 'documents' | 'finance' | 'timeline';
 
-export const ShipmentDetail: React.FC<ShipmentDetailProps> = ({ shipmentId, onBack }) => {
+export const ShipmentDetail: React.FC<ShipmentDetailProps> = ({ shipmentId, onBack, onEdit }) => {
   const [shipment, setShipment] = useState<Shipment | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [isLoading, setIsLoading] = useState(true);
@@ -124,9 +125,25 @@ export const ShipmentDetail: React.FC<ShipmentDetailProps> = ({ shipmentId, onBa
               <button onClick={loadShipment} className="p-2 rounded-lg hover:bg-slate-100 text-slate-600">
                 <RefreshCw size={18} />
               </button>
-              <button className="p-2 rounded-lg hover:bg-slate-100 text-slate-600">
-                <Edit size={18} />
+              <button
+                onClick={() => {
+                  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+                  window.open(`${baseUrl}/export/shipment/${shipmentId}/pdf`, '_blank');
+                }}
+                className="p-2 rounded-lg hover:bg-slate-100 text-slate-600"
+                title="Télécharger PDF"
+              >
+                <Download size={18} />
               </button>
+              {onEdit && (
+                <button
+                  onClick={onEdit}
+                  className="p-2 rounded-lg hover:bg-slate-100 text-slate-600"
+                  title="Modifier le dossier"
+                >
+                  <Edit size={18} />
+                </button>
+              )}
             </div>
           </div>
 
@@ -189,6 +206,7 @@ export const ShipmentDetail: React.FC<ShipmentDetailProps> = ({ shipmentId, onBa
         {activeTab === 'finance' && <ShipmentFinance shipment={shipment} onRefresh={loadShipment} />}
         {activeTab === 'timeline' && <ShipmentTimeline shipment={shipment} />}
       </div>
+
     </div>
   );
 };

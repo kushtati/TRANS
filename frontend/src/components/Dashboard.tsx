@@ -7,16 +7,20 @@ import {
   ChevronRight, Anchor, FileText, Wallet
 } from 'lucide-react';
 import { api } from '../lib/api';
+import { useDebounce } from '../hooks/useDebounce';
+import { DashboardCharts } from './DashboardCharts';
 import type { Shipment, DashboardStats } from '../types';
 
 interface DashboardProps {
   onViewShipment: (id: string) => void;
   onCreateShipment: () => void;
+  searchQuery?: string;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
   onViewShipment,
   onCreateShipment,
+  searchQuery: externalSearch,
 }) => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [shipments, setShipments] = useState<Shipment[]>([]);
@@ -24,22 +28,47 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
+  // Sync external search from AppLayout
   useEffect(() => {
-    loadDashboard();
+    if (externalSearch !== undefined) {
+      setSearchQuery(externalSearch);
+    }
+  }, [externalSearch]);
+
+  const debouncedSearch = useDebounce(searchQuery, 400);
+
+  // Load stats once
+  useEffect(() => {
+    loadStats();
   }, []);
 
-  const loadDashboard = async () => {
+  // Reload shipments when search or filter changes
+  useEffect(() => {
+    loadShipments();
+  }, [debouncedSearch, statusFilter]);
+
+  const loadStats = async () => {
+    try {
+      const res = await api.get<{ stats: DashboardStats }>('/shipments/stats');
+      if (res.data?.stats) setStats(res.data.stats);
+    } catch (error) {
+      console.error('Failed to load stats:', error);
+    }
+  };
+
+  const loadShipments = async () => {
     setIsLoading(true);
     try {
-      const [statsRes, shipmentsRes] = await Promise.all([
-        api.get<{ stats: DashboardStats }>('/shipments/stats'),
-        api.get<{ shipments: Shipment[] }>('/shipments?limit=10'),
-      ]);
+      const params = new URLSearchParams({ limit: '20' });
+      if (statusFilter !== 'ALL') params.set('status', statusFilter);
+      if (debouncedSearch) params.set('search', debouncedSearch);
 
-      if (statsRes.data?.stats) setStats(statsRes.data.stats);
-      if (shipmentsRes.data?.shipments) setShipments(shipmentsRes.data.shipments);
+      const res = await api.get<{ shipments: Shipment[]; pagination: { total: number; pages: number } }>(
+        `/shipments?${params.toString()}`
+      );
+      if (res.data?.shipments) setShipments(res.data.shipments);
     } catch (error) {
-      console.error('Failed to load dashboard:', error);
+      console.error('Failed to load shipments:', error);
     } finally {
       setIsLoading(false);
     }
@@ -89,16 +118,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   };
 
   // Filter shipments
-  const filteredShipments = shipments.filter((s) => {
-    const matchesSearch = !searchQuery || 
-      s.trackingNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.clientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.blNumber?.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'ALL' || s.status === statusFilter;
-    
-    return matchesSearch && matchesStatus;
-  });
+  // Server already filters — just display
+  const filteredShipments = shipments;
 
   if (isLoading) {
     return (
@@ -204,6 +225,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       )}
 
+      {/* Charts */}
+      {stats && <DashboardCharts stats={stats} />}
+
       {/* Search & Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="flex-1 relative">
@@ -236,7 +260,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
 
         <button
-          onClick={loadDashboard}
+          onClick={() => { loadStats(); loadShipments(); }}
           className="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
         >
           <RefreshCw size={18} className="text-slate-600" />

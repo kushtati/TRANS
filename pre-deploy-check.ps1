@@ -64,11 +64,11 @@ if (Test-Path "backend/package.json") {
         $warnings++
     }
     
-    if (Test-Path "backend/railway.toml") {
-        Write-Host "   ✅ railway.toml configuré" -ForegroundColor Green
+    if (Test-Path "backend/railway.json") {
+        Write-Host "   ✅ railway.json configuré" -ForegroundColor Green
     } else {
-        Write-Host "   ❌ railway.toml manquant!" -ForegroundColor Red
-        $errors++
+        Write-Host "   ⚠️  railway.json manquant" -ForegroundColor Yellow
+        $warnings++
     }
     
     if (Test-Path "backend/nixpacks.toml") {

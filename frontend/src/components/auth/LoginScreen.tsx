@@ -6,17 +6,20 @@ import {
   AlertCircle, Zap 
 } from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
+import type { User } from '../../types';
 
 interface LoginScreenProps {
   onBack: () => void;
-  onSuccess: (user: any) => void;
+  onSuccess: (user: User) => void;
   onNeedsVerification: (email: string) => void;
+  onForgotPassword?: () => void;
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ 
   onBack, 
   onSuccess,
   onNeedsVerification,
+  onForgotPassword,
 }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -45,7 +48,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     setError('');
 
     try {
-      const response = await api.post<{ user: any }>('/auth/login', {
+      const response = await api.post<{ user: User }>('/auth/login', {
         email: email.trim().toLowerCase(),
         password,
       });
@@ -167,8 +170,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 type="button"
                 className="text-sm text-slate-500 hover:text-blue-400 transition-colors"
                 onClick={() => {
-                  // TODO: Implement forgot password
-                  alert('Fonctionnalité à venir');
+                  onForgotPassword?.();
                 }}
               >
                 Mot de passe oublié ?
@@ -219,7 +221,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       {/* Footer */}
       <div className="p-6 text-center">
         <p className="text-slate-600 text-xs">
-          © 2026 E-Trans · v3.0.0
+          © 2026 E-Trans · v2.2.0
         </p>
       </div>
     </div>

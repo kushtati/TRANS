@@ -11,6 +11,6 @@
     "declaration": false,
     "resolveJsonModule": true
   },
-  "include": ["server/**/*", "prisma/**/*"],
+  "include": ["src/**/*", "prisma/**/*"],
   "exclude": ["node_modules", "dist"]
 }
