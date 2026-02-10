@@ -11,7 +11,7 @@ import type { ContainerType, CustomsRegime } from '../types';
 // UUID fallback for older mobile browsers
 const generateId = (): string => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return generateId();
+    return crypto.randomUUID();
   }
   // Fallback for older browsers
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
