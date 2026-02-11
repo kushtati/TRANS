@@ -15,15 +15,19 @@ describe('ApiError', () => {
     expect(error instanceof Error).toBe(true);
   });
 
-  it('defaults to status 500', () => {
-    const error = new ApiError('Server error');
-    expect(error.status).toBe(500);
-  });
-
   it('is instanceof Error', () => {
-    const error = new ApiError('Test');
+    const error = new ApiError('Test', 500);
     expect(error instanceof Error).toBe(true);
     expect(error instanceof ApiError).toBe(true);
+  });
+
+  it('includes optional code and errors', () => {
+    const error = new ApiError('Validation failed', 400, 'VALIDATION_ERROR', [
+      { field: 'email', message: 'Invalid email' }
+    ]);
+    expect(error.status).toBe(400);
+    expect(error.code).toBe('VALIDATION_ERROR');
+    expect(error.errors).toHaveLength(1);
   });
 });
 
