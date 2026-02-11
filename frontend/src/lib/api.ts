@@ -11,7 +11,7 @@ if (typeof window !== 'undefined' && !import.meta.env.DEV && API_BASE.includes('
 export class ApiError extends Error {
   constructor(
     message: string,
-    public status: number,
+    public status: number = 500,
     public code?: string,
     public errors?: Array<{ field: string; message: string }>
   ) {

@@ -20,7 +20,7 @@
   }
 
   .dark input::placeholder, .dark select::placeholder, .dark textarea::placeholder {
-    color: rgb(100 116 139); /* slate-500 */
+    color: rgb(148 163 184); /* slate-400 */
   }
 
   .dark .bg-white {

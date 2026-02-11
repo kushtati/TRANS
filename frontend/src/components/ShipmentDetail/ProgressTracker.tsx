@@ -1,7 +1,7 @@
 // src/components/ShipmentDetail/ProgressTracker.tsx
 
 import React from 'react';
-import { CheckCircle2, Circle, Clock } from 'lucide-react';
+import { CheckCircle2, Circle } from 'lucide-react';
 import type { ShipmentStatus } from '../../types';
 import { statusLabels } from '../../utils/format';
 

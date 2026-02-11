@@ -1,8 +1,8 @@
 // src/services/workflow.service.ts
 
+import { ShipmentStatus } from '@prisma/client';
 import { prisma } from '../config/prisma.js';
 import { log } from '../config/logger.js';
-import { ShipmentStatus } from '@prisma/client';
 
 // ============================================
 // 1. DOCUMENT → STATUS AUTO-PROGRESSION

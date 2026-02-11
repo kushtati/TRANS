@@ -53,7 +53,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         password,
       });
 
-      onSuccess(response.data?.user);
+      if (response.data?.user) {
+        onSuccess(response.data.user);
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         // Email non vérifié → rediriger vers vérification
@@ -221,7 +223,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       {/* Footer */}
       <div className="p-6 text-center">
         <p className="text-slate-600 text-xs">
-          © 2026 E-Trans · v3.0.0
+          © 2026 E-Trans · v2.2.0
         </p>
       </div>
     </div>

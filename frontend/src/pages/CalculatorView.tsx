@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Calculator, Loader2, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
-import { api, ApiError } from '../lib/api';
+import { api } from '../lib/api';
 import { formatGNF } from '../utils/format';
 
 interface DutyResult {

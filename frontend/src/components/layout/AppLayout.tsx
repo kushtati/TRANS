@@ -4,11 +4,11 @@ import React, { useState, useCallback } from 'react';
 import {
   Zap, Search, Bell, LogOut, User as UserIcon, Menu, X,
   LayoutDashboard, PlusCircle, Calculator,
-  PieChart, Settings, MessageSquare,
+  PieChart, Settings, MessageSquare, type LucideIcon,
 } from 'lucide-react';
 import type { User, Role } from '../../types';
 
-type AppView = 'dashboard' | 'shipment' | 'create' | 'accounting' | 'calculator' | 'settings' | 'assistant' | 'detail';
+type AppView = 'dashboard' | 'shipment' | 'create' | 'accounting' | 'calculator' | 'settings' | 'assistant' | 'detail' | 'audit' | 'edit';
 
 interface AppLayoutProps {
   user: User;
@@ -22,7 +22,7 @@ interface AppLayoutProps {
 interface NavItem {
   id: AppView;
   label: string;
-  icon: React.FC<{ size?: number; strokeWidth?: number }>;
+  icon: LucideIcon;
   roles?: Role[];
 }
 

@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/prisma.js';
 import { log } from '../config/logger.js';
+import { auth, requireRole } from '../middleware/auth.js';
 import { autoAdvanceStatus, generateAlerts, getNextSteps, DOCUMENT_FIELD_HINTS } from '../services/workflow.service.js';
 import {
   createShipmentSchema,
@@ -14,7 +15,6 @@ import {
   updateStatusSchema,
 } from '../validators/shipment.validators.js';
 import { generateTrackingNumber } from '../utils/tracking.js';
-import { auth, requireRole } from '../middleware/auth.js';
 
 const router = Router();
 

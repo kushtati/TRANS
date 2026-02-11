@@ -5,4 +5,3 @@ export { ErrorBoundary } from './ErrorBoundary';
 export { Modal } from './Modal';
 export { ConfirmDialog } from './ConfirmDialog';
 export { OfflineIndicator } from './OfflineIndicator';
-export { OfflineIndicator } from './OfflineIndicator';

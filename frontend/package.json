@@ -1,11 +1,11 @@
 {
   "name": "etrans-frontend",
   "private": true,
-  "version": "3.0.0",
+  "version": "2.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

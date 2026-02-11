@@ -100,10 +100,12 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
       });
 
       setSuccess(true);
-      
+
       // Délai pour montrer le succès
       setTimeout(() => {
-        onSuccess(response.data?.user);
+        if (response.data?.user) {
+          onSuccess(response.data.user);
+        }
       }, 1500);
     } catch (err) {
       if (err instanceof ApiError) {

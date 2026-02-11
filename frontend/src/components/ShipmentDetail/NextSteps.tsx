@@ -1,7 +1,7 @@
 // src/components/ShipmentDetail/NextSteps.tsx
 
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, FileText, CreditCard, Truck, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { ArrowRight, FileText, CreditCard, Truck, CheckCircle2 } from 'lucide-react';
 import { api } from '../../lib/api';
 
 interface NextStep {
