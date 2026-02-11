@@ -4,7 +4,8 @@ import React, { useState, useCallback } from 'react';
 import {
   Zap, Search, Bell, LogOut, User as UserIcon, Menu, X,
   LayoutDashboard, PlusCircle, Calculator,
-  PieChart, Settings, MessageSquare, type LucideIcon,
+  PieChart, Settings, MessageSquare,
+  type LucideIcon,
 } from 'lucide-react';
 import type { User, Role } from '../../types';
 

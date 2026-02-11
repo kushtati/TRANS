@@ -7,8 +7,7 @@ const getBaseCookieOptions = (): CookieOptions => ({
   httpOnly: true,
   secure: isProduction,
   sameSite: isProduction ? 'none' : 'lax',
-  // Don't set domain for cross-origin cookies (Vercel <-> Railway)
-  // Setting domain can prevent cookies from working across different domains
+  domain: env.COOKIE_DOMAIN || undefined,
   path: '/',
 });
 

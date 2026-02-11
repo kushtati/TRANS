@@ -172,12 +172,14 @@ router.post('/calculate-customs', async (req: Request, res: Response) => {
 // ============================================
 // POST /api/ai/extract-bl
 // Extract shipment data from a Bill of Lading (PDF/image)
-// Uses Gemini Vision to read and parse the document
+// 100% GRATUIT — pdf-parse + tesseract.js + regex
+// Aucune API payante requise
 // ============================================
 
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
+import { extractBLData } from '../services/bl-extract.service.js';
 
 const blUpload = multer({
   dest: path.resolve(process.cwd(), 'uploads/temp'),
@@ -187,47 +189,6 @@ const blUpload = multer({
     cb(null, allowed.includes(file.mimetype));
   },
 });
-
-const BL_EXTRACT_PROMPT = `Tu es un expert en transit maritime. Analyse ce connaissement (Bill of Lading) et extrais TOUTES les informations suivantes en JSON strict.
-
-Retourne UNIQUEMENT un objet JSON valide, sans texte avant ni après, avec ces champs (laisse vide "" si non trouvé) :
-
-{
-  "blNumber": "numéro du BL/connaissement",
-  "clientName": "nom du destinataire/consignee/notify party",
-  "clientAddress": "adresse du destinataire",
-  "description": "description complète de la marchandise",
-  "hsCode": "code SH/HS code si présent",
-  "packaging": "type d'emballage (sacs, cartons, palettes...)",
-  "packageCount": 0,
-  "grossWeight": 0,
-  "netWeight": 0,
-  "cifValue": 0,
-  "cifCurrency": "USD",
-  "vesselName": "nom du navire",
-  "voyageNumber": "numéro de voyage",
-  "portOfLoading": "port de chargement",
-  "portOfDischarge": "port de déchargement",
-  "supplierName": "nom de l'expéditeur/shipper",
-  "supplierCountry": "pays de l'expéditeur",
-  "containers": [
-    {
-      "number": "numéro conteneur",
-      "type": "20DRY ou 40DRY ou 40HC ou 20REEFER ou 40REEFER",
-      "sealNumber": "numéro de scellé",
-      "grossWeight": 0,
-      "packageCount": 0
-    }
-  ]
-}
-
-Règles importantes :
-- Pour packageCount et grossWeight, extrais les NOMBRES uniquement
-- Pour les conteneurs, identifie le type : 20' = DRY_20, 40' = DRY_40, 40'HC = DRY_40HC, etc.
-- Le port de déchargement en Guinée est généralement CONAKRY
-- Extrais TOUS les conteneurs listés
-- Si plusieurs marchandises, combine-les dans description
-- Ne retourne QUE le JSON, rien d'autre`;
 
 router.post('/extract-bl', (req: Request, res: Response) => {
   blUpload.single('file')(req, res, async (uploadErr) => {
@@ -246,79 +207,26 @@ router.post('/extract-bl', (req: Request, res: Response) => {
         });
       }
 
-      if (!model) {
-        // No AI available — return empty structure so user fills manually
-        cleanupTempFile(req.file.path);
-        return res.json({
-          success: true,
-          data: {
-            extracted: null,
-            message: 'Service IA non disponible. Veuillez remplir les champs manuellement.',
-          },
-        });
-      }
-
-      // Read file as base64
-      const fileBuffer = fs.readFileSync(req.file.path);
-      const base64Data = fileBuffer.toString('base64');
-      const mimeType = req.file.mimetype;
-
       log.info('BL extraction started', {
         userId: req.user!.id,
         filename: req.file.originalname,
         size: req.file.size,
-        mimeType,
+        mimeType: req.file.mimetype,
       });
 
-      // Send to Gemini Vision
-      const result = await model.generateContent([
-        { text: BL_EXTRACT_PROMPT },
-        {
-          inlineData: {
-            mimeType,
-            data: base64Data,
-          },
-        },
-      ]);
+      // Extract using free libraries (pdf-parse + tesseract.js)
+      const { data: extracted, rawText, method } = await extractBLData(
+        req.file.path,
+        req.file.mimetype
+      );
 
-      const responseText = result.response.text();
-
-      // Parse JSON from response (strip markdown code fences if present)
-      let extracted;
-      try {
-        const jsonStr = responseText
-          .replace(/```json\s*/g, '')
-          .replace(/```\s*/g, '')
-          .trim();
-        extracted = JSON.parse(jsonStr);
-      } catch {
-        log.warn('BL extraction - failed to parse JSON', { responseText: responseText.substring(0, 500) });
-        cleanupTempFile(req.file.path);
-        return res.json({
-          success: true,
-          data: {
-            extracted: null,
-            rawText: responseText.substring(0, 1000),
-            message: 'Extraction partielle. Certains champs peuvent nécessiter une saisie manuelle.',
-          },
-        });
-      }
-
-      // Normalize container types
-      if (extracted.containers && Array.isArray(extracted.containers)) {
-        extracted.containers = extracted.containers.map((c: any) => ({
-          ...c,
-          type: normalizeContainerType(c.type || ''),
-          grossWeight: typeof c.grossWeight === 'number' ? c.grossWeight : parseFloat(c.grossWeight) || 0,
-          packageCount: typeof c.packageCount === 'number' ? c.packageCount : parseInt(c.packageCount) || 0,
-        }));
-      }
-
-      // Normalize numeric fields
-      extracted.packageCount = parseInt(extracted.packageCount) || 0;
-      extracted.grossWeight = parseFloat(extracted.grossWeight) || 0;
-      extracted.netWeight = parseFloat(extracted.netWeight) || 0;
-      extracted.cifValue = parseFloat(extracted.cifValue) || 0;
+      // Count how many fields were actually extracted
+      const filledCount = Object.entries(extracted)
+        .filter(([k, v]) => {
+          if (k === 'containers') return (v as any[]).length > 0;
+          if (typeof v === 'number') return v > 0;
+          return v && v !== '';
+        }).length;
 
       // Save the uploaded BL file permanently
       const ext = path.extname(req.file.originalname) || '.pdf';
@@ -330,32 +238,48 @@ router.post('/extract-bl', (req: Request, res: Response) => {
 
       log.info('BL extraction completed', {
         userId: req.user!.id,
-        fieldsExtracted: Object.keys(extracted).filter(k => extracted[k] && extracted[k] !== '' && extracted[k] !== 0).length,
+        method,
+        fieldsExtracted: filledCount,
         containersFound: extracted.containers?.length || 0,
       });
 
-      // Audit
+      // Audit log
       await prisma.auditLog.create({
         data: {
           action: 'BL_EXTRACTED',
-          entity: 'AI',
+          entity: 'Document',
           entityId: req.file.originalname,
-          details: { fieldsExtracted: Object.keys(extracted).length },
+          details: { method, fieldsExtracted: filledCount, textLength: rawText.length },
           userId: req.user!.id,
         },
       });
 
+      // Build response message
+      let message = '';
+      if (filledCount >= 8) {
+        message = `✅ ${filledCount} champs extraits avec succès (${method})`;
+      } else if (filledCount >= 3) {
+        message = `⚠️ ${filledCount} champs extraits. Complétez les champs manquants manuellement.`;
+      } else if (filledCount > 0) {
+        message = `Extraction partielle (${filledCount} champs). Le document est peut-être difficile à lire.`;
+      } else {
+        message = 'Extraction non concluante. Veuillez remplir les champs manuellement.';
+      }
+
       res.json({
         success: true,
         data: {
-          extracted,
+          extracted: filledCount > 0 ? extracted : null,
           fileUrl,
           fileName: req.file.originalname,
-          message: 'Données extraites du BL avec succès.',
+          method,
+          message,
         },
       });
     } catch (error) {
-      if (req.file) cleanupTempFile(req.file.path);
+      if (req.file) {
+        try { fs.unlinkSync(req.file.path); } catch {}
+      }
       log.error('BL extraction error', error);
       res.status(500).json({
         success: false,
@@ -364,20 +288,5 @@ router.post('/extract-bl', (req: Request, res: Response) => {
     }
   });
 });
-
-function cleanupTempFile(filePath: string) {
-  try { fs.unlinkSync(filePath); } catch {}
-}
-
-function normalizeContainerType(raw: string): string {
-  const s = raw.toUpperCase().replace(/[^A-Z0-9]/g, '');
-  if (s.includes('40') && s.includes('HC')) return 'DRY_40HC';
-  if (s.includes('40') && s.includes('REEFER')) return 'REEFER_40';
-  if (s.includes('40') && s.includes('HR')) return 'REEFER_40HR';
-  if (s.includes('20') && s.includes('REEFER')) return 'REEFER_20';
-  if (s.includes('40')) return 'DRY_40';
-  if (s.includes('20')) return 'DRY_20';
-  return 'DRY_40HC';
-}
 
 export default router;
