@@ -176,116 +176,20 @@ router.post('/calculate-customs', async (req: Request, res: Response) => {
 // Aucune API payante requise
 // ============================================
 
-import multer from 'multer';
-import fs from 'fs';
-import path from 'path';
-import { extractBLData } from '../services/bl-extract.service.js';
+// TEMPORARILY DISABLED: BL extraction causes SIGSEGV crashes on Railway
+// The pdf-parse and tesseract.js libraries use heavy native dependencies
+// that crash in Railway's limited memory environment.
+// TODO: Re-enable when Railway memory is upgraded or use external API
 
-const blUpload = multer({
-  dest: path.resolve(process.cwd(), 'uploads/temp'),
-  limits: { fileSize: 15 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
-    cb(null, allowed.includes(file.mimetype));
-  },
-});
+// import multer from 'multer';
+// import fs from 'fs';
+// import path from 'path';
+// import { extractBLData } from '../services/bl-extract.service.js';
 
 router.post('/extract-bl', (req: Request, res: Response) => {
-  blUpload.single('file')(req, res, async (uploadErr) => {
-    try {
-      if (uploadErr) {
-        return res.status(400).json({
-          success: false,
-          message: `Erreur upload : ${uploadErr.message}`,
-        });
-      }
-
-      if (!req.file) {
-        return res.status(400).json({
-          success: false,
-          message: 'Fichier BL requis',
-        });
-      }
-
-      log.info('BL extraction started', {
-        userId: req.user!.id,
-        filename: req.file.originalname,
-        size: req.file.size,
-        mimeType: req.file.mimetype,
-      });
-
-      // Extract using free libraries (pdf-parse + tesseract.js)
-      const { data: extracted, rawText, method } = await extractBLData(
-        req.file.path,
-        req.file.mimetype
-      );
-
-      // Count how many fields were actually extracted
-      const filledCount = Object.entries(extracted)
-        .filter(([k, v]) => {
-          if (k === 'containers') return (v as any[]).length > 0;
-          if (typeof v === 'number') return v > 0;
-          return v && v !== '';
-        }).length;
-
-      // Save the uploaded BL file permanently
-      const ext = path.extname(req.file.originalname) || '.pdf';
-      const permanentName = `bl-${Date.now()}${ext}`;
-      const permanentPath = path.resolve(process.cwd(), 'uploads', permanentName);
-      fs.renameSync(req.file.path, permanentPath);
-
-      const fileUrl = `/api/upload/files/${permanentName}`;
-
-      log.info('BL extraction completed', {
-        userId: req.user!.id,
-        method,
-        fieldsExtracted: filledCount,
-        containersFound: extracted.containers?.length || 0,
-      });
-
-      // Audit log
-      await prisma.auditLog.create({
-        data: {
-          action: 'BL_EXTRACTED',
-          entity: 'Document',
-          entityId: req.file.originalname,
-          details: { method, fieldsExtracted: filledCount, textLength: rawText.length },
-          userId: req.user!.id,
-        },
-      });
-
-      // Build response message
-      let message = '';
-      if (filledCount >= 8) {
-        message = `✅ ${filledCount} champs extraits avec succès (${method})`;
-      } else if (filledCount >= 3) {
-        message = `⚠️ ${filledCount} champs extraits. Complétez les champs manquants manuellement.`;
-      } else if (filledCount > 0) {
-        message = `Extraction partielle (${filledCount} champs). Le document est peut-être difficile à lire.`;
-      } else {
-        message = 'Extraction non concluante. Veuillez remplir les champs manuellement.';
-      }
-
-      res.json({
-        success: true,
-        data: {
-          extracted: filledCount > 0 ? extracted : null,
-          fileUrl,
-          fileName: req.file.originalname,
-          method,
-          message,
-        },
-      });
-    } catch (error) {
-      if (req.file) {
-        try { fs.unlinkSync(req.file.path); } catch {}
-      }
-      log.error('BL extraction error', error);
-      res.status(500).json({
-        success: false,
-        message: 'Erreur lors de l\'extraction du BL',
-      });
-    }
+  res.status(503).json({
+    success: false,
+    message: 'Extraction BL temporairement désactivée. Veuillez remplir les champs manuellement.',
   });
 });
 
