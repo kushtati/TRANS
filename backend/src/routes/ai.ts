@@ -20,9 +20,9 @@ const aiLimiter = rateLimit({
 });
 router.use(aiLimiter);
 
-// Gemini client
+// Gemini client (2.5-flash remplace 1.5-flash, retiré par Google)
 const genAI = env.GEMINI_API_KEY ? new GoogleGenerativeAI(env.GEMINI_API_KEY) : null;
-const model = genAI?.getGenerativeModel({ model: 'gemini-1.5-flash' });
+const model = genAI?.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
 // Schemas
 const chatSchema = z.object({
@@ -53,7 +53,7 @@ Réponds de manière concise en français. Utilise des montants en GNF.`;
 router.get('/status', (req: Request, res: Response) => {
   res.json({
     success: true,
-    data: { available: !!model, model: model ? 'gemini-1.5-flash' : null },
+    data: { available: !!model, model: model ? 'gemini-2.5-flash' : null },
   });
 });
 
@@ -92,8 +92,15 @@ router.post('/chat', async (req: Request, res: Response) => {
         message: 'Message invalide',
       });
     }
-    log.error('AI chat error', error);
-    res.status(500).json({ success: false, message: 'Erreur du service IA' });
+    const errMsg = (error as any)?.message || String(error);
+    log.error('AI chat error', { message: errMsg, stack: (error as any)?.stack });
+
+    let userMessage = 'Erreur du service IA';
+    if (errMsg.includes('404')) userMessage = 'Modèle IA indisponible. Contactez le support.';
+    else if (errMsg.includes('API_KEY')) userMessage = 'Clé API IA invalide.';
+    else if (errMsg.includes('quota') || errMsg.includes('429')) userMessage = 'Limite IA atteinte. Réessayez dans 1 minute.';
+
+    res.status(500).json({ success: false, message: userMessage });
   }
 });
 
