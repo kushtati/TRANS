@@ -270,18 +270,41 @@ router.post('/extract-bl', blUpload.single('file'), async (req: Request, res: Re
       mimeType: req.file.mimetype,
     });
 
-    // Send to Gemini for structured extraction
-    const result = await model.generateContent([
-      {
-        inlineData: {
-          mimeType: req.file.mimetype,
-          data: base64Data,
-        },
-      },
-      { text: BL_EXTRACTION_PROMPT },
-    ]);
+    // Send to Gemini using explicit contents format (more compatible)
+    const result = await model.generateContent({
+      contents: [{
+        role: 'user',
+        parts: [
+          {
+            inlineData: {
+              mimeType: req.file.mimetype,
+              data: base64Data,
+            },
+          },
+          { text: BL_EXTRACTION_PROMPT },
+        ],
+      }],
+    });
 
-    const responseText = result.response.text();
+    const response = result.response;
+
+    // Check if response was blocked
+    if (!response.candidates || response.candidates.length === 0) {
+      log.warn('BL extraction: Gemini returned no candidates', {
+        userId: req.user!.id,
+        blockReason: (response as any).promptFeedback?.blockReason,
+      });
+      return res.json({
+        success: true,
+        data: {
+          extracted: null,
+          fileUrl,
+          message: 'L\'IA n\'a pas pu analyser ce document. Remplissez les champs manuellement.',
+        },
+      });
+    }
+
+    const responseText = response.text();
 
     // Parse JSON from response (Gemini may wrap in markdown code blocks)
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
@@ -330,11 +353,23 @@ router.post('/extract-bl', blUpload.single('file'), async (req: Request, res: Re
         },
       });
     }
-  } catch (error) {
-    log.error('BL extraction error', error);
+  } catch (error: any) {
+    const errMsg = error?.message || String(error);
+    log.error('BL extraction error', { message: errMsg, stack: error?.stack });
+
+    // Provide specific error messages
+    let userMessage = 'Erreur lors de l\'extraction. Réessayez ou remplissez manuellement.';
+    if (errMsg.includes('API_KEY')) {
+      userMessage = 'Clé API Gemini invalide. Vérifiez GEMINI_API_KEY.';
+    } else if (errMsg.includes('quota') || errMsg.includes('429')) {
+      userMessage = 'Limite de requêtes IA atteinte. Réessayez dans quelques minutes.';
+    } else if (errMsg.includes('size') || errMsg.includes('too large')) {
+      userMessage = 'Fichier trop volumineux pour l\'analyse IA. Essayez un fichier plus petit.';
+    }
+
     res.status(500).json({
       success: false,
-      message: 'Erreur lors de l\'extraction. Réessayez ou remplissez manuellement.',
+      message: userMessage,
     });
   }
 });
