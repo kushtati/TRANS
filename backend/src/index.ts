@@ -109,7 +109,7 @@ app.get('/api/health', async (_req, res) => {
       status: 'healthy',
       timestamp: new Date().toISOString(),
       environment: env.NODE_ENV,
-      version: '2.2.0',
+      version: '3.2.0',
     });
   } catch (error) {
     res.status(503).json({
@@ -174,7 +174,7 @@ process.on('SIGINT', gracefulShutdown);
 
 const PORT = env.PORT;
 app.listen(PORT, () => {
-  log.info(`🚀 E-Trans v2.2 running on port ${PORT}`);
+  log.info(`🚀 E-Trans v3.2 running on port ${PORT}`);
   log.info(`📍 Environment: ${env.NODE_ENV}`);
   if (isProduction) {
     log.info(`🌐 Frontend: ${env.FRONTEND_URL}`);
