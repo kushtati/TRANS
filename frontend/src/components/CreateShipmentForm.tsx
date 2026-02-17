@@ -1,7 +1,7 @@
 // src/components/CreateShipmentForm.tsx
 import React, { useState, useRef } from 'react';
 import { ArrowLeft, Save, Ship, User, Package, FileText, MapPin, DollarSign, Plus, Trash2, Loader2, AlertCircle, Upload, CheckCircle2, Sparkles, Eye } from 'lucide-react';
-import { api, ApiError } from '../lib/api';
+import { api, ApiError, getAccessToken } from '../lib/api';
 import type { ContainerType, CustomsRegime } from '../types';
 
 interface CreateShipmentFormProps { onSuccess: () => void; onCancel: () => void; }
@@ -43,6 +43,11 @@ export const CreateShipmentForm: React.FC<CreateShipmentFormProps> = ({ onSucces
       const base = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
       const url = `${base}/ai/extract-bl`;
 
+      // Build headers with Bearer token (cookies blocked on mobile Safari)
+      const headers: Record<string, string> = {};
+      const token = getAccessToken();
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       // Retry logic (max 2 retries on 502/503/504/network error)
       let resp: Response | null = null;
       const delays = [2000, 4000];
@@ -51,12 +56,11 @@ export const CreateShipmentForm: React.FC<CreateShipmentFormProps> = ({ onSucces
           if (attempt > 0) {
             setExtractionMessage(`Nouvelle tentative (${attempt}/2)...`);
             await new Promise(r => setTimeout(r, delays[attempt - 1]));
-            // Rebuild FormData (body consumed after first fetch)
             const retryFd = new window.FormData();
             retryFd.append('file', blFile);
-            resp = await fetch(url, { method: 'POST', credentials: 'include', body: retryFd });
+            resp = await fetch(url, { method: 'POST', headers, credentials: 'include', body: retryFd });
           } else {
-            resp = await fetch(url, { method: 'POST', credentials: 'include', body: fd });
+            resp = await fetch(url, { method: 'POST', headers, credentials: 'include', body: fd });
           }
           if (resp.ok || (resp.status < 500 && resp.status !== 0)) break;
           if (attempt < 2 && [502, 503, 504].includes(resp.status)) continue;

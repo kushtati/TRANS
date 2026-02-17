@@ -43,6 +43,10 @@ export function hasToken(): boolean {
   return _accessToken !== null;
 }
 
+export function getAccessToken(): string | null {
+  return _accessToken;
+}
+
 class ApiClient {
   private isRefreshing = false;
   private refreshQueue: Array<() => void> = [];
@@ -105,8 +109,8 @@ class ApiClient {
             continue;
           }
 
-          // Handle token expiration
-          if (response.status === 401 && json.code === 'TOKEN_EXPIRED' && !isRetry) {
+          // Handle token expiration or missing token — try refresh
+          if (response.status === 401 && (json.code === 'TOKEN_EXPIRED' || json.code === 'NO_TOKEN') && !isRetry && _refreshToken) {
             return this.handleTokenRefresh<T>(method, endpoint, data);
           }
 
