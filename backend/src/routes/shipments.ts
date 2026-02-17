@@ -345,6 +345,7 @@ router.get('/:id/next-steps', async (req: Request, res: Response) => {
 // POST /api/shipments
 // ============================================
 
+// Seul le DG et l'Assistant peuvent créer un dossier
 router.post('/', requireRole('DIRECTOR', 'AGENT'), async (req: Request, res: Response) => {
   try {
     const data = createShipmentSchema.parse(req.body);

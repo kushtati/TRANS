@@ -124,7 +124,7 @@ export const addDocumentSchema = z.object({
     'MSC_INVOICE', 'DELIVERY_NOTE', 'CUSTOMS_INVOICE', 'OTHER',
   ]),
   name: z.string().min(1, 'Nom du document requis'),
-  url: z.string().url('URL invalide'),
+  url: z.string().min(1, 'URL requise'),
   reference: z.string().optional(),
   issueDate: z.string().datetime({ offset: true }).optional()
     .or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()),

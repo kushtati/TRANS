@@ -10,6 +10,7 @@ import { log } from '../config/logger.js';
 import { auth } from '../middleware/auth.js';
 import { setAuthCookies, clearAuthCookies } from '../utils/cookies.js';
 import { generateVerificationCode, sendVerificationEmail, sendWelcomeEmail } from '../services/email.service.js';
+import { recordLogin, notifyUserLogin, notifyPasswordReset } from '../services/notification.service.js';
 
 const router = Router();
 
@@ -401,6 +402,21 @@ router.post('/login', async (req: Request, res: Response) => {
     // Set cookies
     setAuthCookies(res, tokens);
 
+    // Enregistrer la connexion dans l'historique
+    const clientIp = req.ip || req.headers['x-forwarded-for']?.toString() || 'Inconnu';
+    const ua = req.headers['user-agent'];
+    await recordLogin(user.id, true, clientIp, ua);
+
+    // Notifier le DG si c'est un collaborateur qui se connecte
+    if (user.role !== 'DIRECTOR') {
+      const { device } = (() => {
+        if (!ua) return { device: 'Inconnu' };
+        if (/mobile|android|iphone|ipad/i.test(ua)) return { device: 'Mobile' };
+        return { device: 'Desktop' };
+      })();
+      await notifyUserLogin(user.companyId, user.id, user.name, user.role, device);
+    }
+
     log.audit('User logged in', { userId: user.id, email: user.email });
 
     res.json({
@@ -683,6 +699,9 @@ router.post('/reset-password', async (req: Request, res: Response) => {
         userId: user.id,
       },
     });
+
+    // Notifier le DG
+    await notifyPasswordReset(user.companyId, user.id, user.name);
 
     log.audit('Password reset completed', { userId: user.id });
 

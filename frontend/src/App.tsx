@@ -27,6 +27,7 @@ const CalculatorView = lazy(() => import('./pages/CalculatorView').then(m => ({ 
 const AccountingView = lazy(() => import('./pages/AccountingView').then(m => ({ default: m.AccountingView })));
 const AuditTrailView = lazy(() => import('./pages/AuditTrailView').then(m => ({ default: m.AuditTrailView })));
 const EditShipmentView = lazy(() => import('./pages/EditShipmentView').then(m => ({ default: m.EditShipmentView })));
+const TeamManagementView = lazy(() => import('./pages/TeamManagementView').then(m => ({ default: m.TeamManagementView })));
 
 const ViewLoader = () => (
   <div className="flex items-center justify-center min-h-[300px]">
@@ -34,7 +35,7 @@ const ViewLoader = () => (
   </div>
 );
 
-type View = 'dashboard' | 'create' | 'detail' | 'settings' | 'shipment' | 'accounting' | 'calculator' | 'assistant' | 'audit' | 'edit';
+type View = 'dashboard' | 'create' | 'detail' | 'settings' | 'shipment' | 'accounting' | 'calculator' | 'assistant' | 'audit' | 'edit' | 'team';
 type AuthScreen = 'welcome' | 'login' | 'register' | 'verify' | 'forgot';
 
 export default function App() {
@@ -158,6 +159,16 @@ export default function App() {
           />
         );
       case 'create':
+        // Seul le DG et l'Assistant peuvent créer un dossier
+        if (user.role !== 'DIRECTOR' && user.role !== 'AGENT') {
+          return (
+            <Dashboard
+              onViewShipment={handleViewShipment}
+              onCreateShipment={() => setCurrentView('create')}
+              searchQuery={searchQuery}
+            />
+          );
+        }
         return (
           <CreateShipmentForm
             onSuccess={() => {
@@ -194,6 +205,10 @@ export default function App() {
         return <AIAssistantView />;
       case 'audit':
         return <AuditTrailView />;
+      case 'team':
+        return user.role === 'DIRECTOR' ? <TeamManagementView /> : (
+          <Dashboard onViewShipment={handleViewShipment} onCreateShipment={() => setCurrentView('create')} />
+        );
       case 'settings':
         return (
           <SettingsView

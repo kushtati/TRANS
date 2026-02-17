@@ -20,7 +20,14 @@ interface JwtPayload {
  */
 export const auth = (req: Request, res: Response, next: NextFunction): void => {
   try {
-    const token = req.cookies?.accessToken;
+    // Cookie first, then Authorization header fallback
+    let token = req.cookies?.accessToken;
+    if (!token) {
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith('Bearer ')) {
+        token = authHeader.slice(7);
+      }
+    }
 
     if (!token) {
       res.status(401).json({

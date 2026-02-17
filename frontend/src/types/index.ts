@@ -193,3 +193,116 @@ export interface DashboardStats {
     shipmentId?: string;
   }>;
 }
+
+// ==================== FACTURES ====================
+
+export type InvoiceStatus = 'DRAFT' | 'ISSUED' | 'PAID' | 'CANCELLED';
+
+export interface InvoiceLine {
+  id: string;
+  description: string;
+  category?: string;
+  quantity: number;
+  unitPrice: number;
+  amount: number;
+}
+
+export interface Invoice {
+  id: string;
+  invoiceNumber: string;
+  shipmentId: string;
+  shipment: {
+    id: string;
+    trackingNumber: string;
+    description: string;
+    blNumber?: string;
+    vesselName?: string;
+  };
+  clientName: string;
+  clientNif?: string;
+  clientPhone?: string;
+  clientAddress?: string;
+  companyName: string;
+  lines: InvoiceLine[];
+  subtotal: number;
+  taxRate: number;
+  taxAmount: number;
+  totalAmount: number;
+  totalProvisions: number;
+  totalDisbursements: number;
+  honoraires: number;
+  amountDue: number;
+  status: InvoiceStatus;
+  issuedAt?: string;
+  dueDate?: string;
+  paidAt?: string;
+  cancelledAt?: string;
+  notes?: string;
+  createdBy: { id: string; name: string };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InvoiceSummary {
+  totalInvoiced: number;
+  totalOutstanding: number;
+  totalPaid: number;
+  count: number;
+  byStatus: {
+    draft: number;
+    issued: number;
+    paid: number;
+    cancelled: number;
+  };
+}
+
+// ==================== ÉQUIPE ====================
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  role: Role;
+  isActive: boolean;
+  emailVerified: boolean;
+  lastLogin?: string;
+  createdAt: string;
+  invitedById?: string;
+  _count: {
+    shipments: number;
+    loginHistory: number;
+  };
+}
+
+export interface LoginHistoryEntry {
+  id: string;
+  userId: string;
+  user: { id: string; name: string; email: string; role: Role };
+  ipAddress?: string;
+  device?: string;
+  browser?: string;
+  success: boolean;
+  createdAt: string;
+}
+
+export interface AppNotification {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  read: boolean;
+  readAt?: string;
+  targetUserId?: string;
+  targetUserName?: string;
+  createdAt: string;
+}
+
+export interface TeamStats {
+  totalMembers: number;
+  activeMembers: number;
+  byRole: { accountants: number; agents: number; clients: number };
+  todayLogins: number;
+  unreadNotifs: number;
+  canAddAccountant: boolean;
+}

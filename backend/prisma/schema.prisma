@@ -31,6 +31,7 @@ model Company {
   users     User[]
   shipments Shipment[]
   clients   Client[]
+  invoices  Invoice[]
 
   @@index([slug])
   @@map("companies")
@@ -64,6 +65,12 @@ model User {
   refreshTokens    RefreshToken[]
   shipments        Shipment[]
   auditLogs        AuditLog[]
+  invoices         Invoice[]
+  loginHistory     LoginHistory[]
+  notifications    Notification[]  @relation("ReceivedNotifications")
+
+  // Qui l'a invité (pour les collaborateurs)
+  invitedById      String?
 
   @@index([email])
   @@index([companyId])
@@ -204,6 +211,7 @@ model Shipment {
   documents       Document[]
   expenses        Expense[]
   timeline        TimelineEvent[]
+  invoices        Invoice[]
   
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
@@ -312,6 +320,130 @@ model TimelineEvent {
   @@map("timeline_events")
 }
 
+// ==================== FACTURES ====================
+
+model Invoice {
+  id              String        @id @default(cuid())
+  invoiceNumber   String        @unique    // FAC-2026-0001
+  
+  // Lien dossier
+  shipmentId      String
+  shipment        Shipment      @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  
+  // Client
+  clientName      String
+  clientNif       String?
+  clientPhone     String?
+  clientAddress   String?
+  
+  // Entreprise émettrice
+  companyId       String
+  company         Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyName     String
+  companyNif      String?
+  companyPhone    String?
+  companyAddress  String?
+  
+  // Lignes de facturation
+  lines           InvoiceLine[]
+  
+  // Montants
+  subtotal        Float                    // Total HT (somme des lignes)
+  taxRate         Float         @default(0) // Taux TVA appliqué (ex: 0, 0.18)
+  taxAmount       Float         @default(0) // Montant TVA
+  totalAmount     Float                    // Total TTC
+  
+  // Provisions et solde
+  totalProvisions Float         @default(0) // Total des provisions reçues du client
+  totalDisbursements Float      @default(0) // Total des débours engagés
+  honoraires      Float         @default(0) // Commission / honoraires du transitaire
+  amountDue       Float         @default(0) // Reste à payer (totalAmount - totalProvisions)
+  
+  // Statut
+  status          InvoiceStatus @default(DRAFT)
+  issuedAt        DateTime?                // Date d'émission
+  dueDate         DateTime?                // Date d'échéance
+  paidAt          DateTime?                // Date de paiement
+  cancelledAt     DateTime?
+  
+  // Métadonnées
+  notes           String?
+  createdById     String
+  createdBy       User          @relation(fields: [createdById], references: [id])
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([shipmentId])
+  @@index([companyId])
+  @@index([invoiceNumber])
+  @@index([status])
+  @@index([createdAt])
+  @@map("invoices")
+}
+
+model InvoiceLine {
+  id          String   @id @default(cuid())
+  description String
+  category    String?            // ExpenseCategory code (DD, TVA, TRANSPORT...)
+  quantity    Int      @default(1)
+  unitPrice   Float
+  amount      Float              // quantity * unitPrice
+  
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  
+  @@index([invoiceId])
+  @@map("invoice_lines")
+}
+
+// ==================== HISTORIQUE DE CONNEXION ====================
+
+model LoginHistory {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress   String?
+  userAgent   String?
+  device      String?             // "Mobile", "Desktop", "Tablet"
+  browser     String?             // "Chrome", "Safari", "Firefox"
+  location    String?             // "Conakry, GN"
+  success     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("login_history")
+}
+
+// ==================== NOTIFICATIONS DG ====================
+
+model Notification {
+  id          String   @id @default(cuid())
+  type        String                       // PASSWORD_CHANGED, LOGIN, MEMBER_CREATED, MEMBER_DELETED
+  title       String
+  message     String
+  read        Boolean  @default(false)
+  readAt      DateTime?
+  
+  // Qui est concerné
+  targetUserId String?                     // L'utilisateur concerné par l'action
+  targetUserName String?
+  
+  // Le DG qui reçoit la notification
+  recipientId String
+  recipient   User     @relation("ReceivedNotifications", fields: [recipientId], references: [id], onDelete: Cascade)
+  
+  companyId   String
+  createdAt   DateTime @default(now())
+
+  @@index([recipientId])
+  @@index([companyId])
+  @@index([read])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
 // ==================== AUDIT ====================
 
 model AuditLog {
@@ -339,6 +471,13 @@ enum Role {
   ACCOUNTANT
   AGENT
   CLIENT
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PAID
+  CANCELLED
 }
 
 enum ShipmentStatus {

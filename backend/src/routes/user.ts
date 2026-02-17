@@ -7,6 +7,7 @@ import { prisma } from '../config/prisma.js';
 import { log } from '../config/logger.js';
 import { auth } from '../middleware/auth.js';
 import { generateVerificationCode, sendVerificationEmail } from '../services/email.service.js';
+import { notifyPasswordChanged } from '../services/notification.service.js';
 
 const router = Router();
 
@@ -114,6 +115,15 @@ router.post('/change-password', async (req: Request, res: Response) => {
     });
 
     log.audit('Password changed', { userId: req.user!.id });
+
+    // Notifier le DG
+    const changedUser = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      select: { name: true, companyId: true },
+    });
+    if (changedUser) {
+      await notifyPasswordChanged(changedUser.companyId, req.user!.id, changedUser.name);
+    }
 
     res.json({
       success: true,

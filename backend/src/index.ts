@@ -20,6 +20,8 @@ import userRoutes from './routes/user.js';
 import auditRoutes from './routes/audit.js';
 import exportRoutes from './routes/export.js';
 import uploadRoutes from './routes/upload.js';
+import invoiceRoutes from './routes/invoices.js';
+import teamRoutes from './routes/team.js';
 import { startCleanupScheduler } from './services/cleanup.service.js';
 
 const app = express();
@@ -130,6 +132,8 @@ app.use('/api/user', userRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/export', exportRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/invoices', invoiceRoutes);
+app.use('/api/team', teamRoutes);
 
 // ============================================
 // 404 handler

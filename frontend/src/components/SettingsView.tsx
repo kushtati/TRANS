@@ -40,10 +40,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ user, onLogout, onNa
   }
 
   const roleLabels: Record<string, string> = {
-    DIRECTOR: 'Directeur',
+    DIRECTOR: 'Directeur Général',
     ACCOUNTANT: 'Comptable',
-    AGENT: 'Agent',
-    CLIENT: 'Client',
+    AGENT: 'Assistant',
+    CLIENT: 'Passeur',
   };
 
   return (
