@@ -47,117 +47,68 @@ router.get('/stats', async (req: Request, res: Response) => {
   try {
     const companyId = req.user!.companyId;
 
-    // Get shipment counts by status
+    // Run ALL queries in parallel (single Promise.all instead of sequential batches)
     const [
-      total,
-      pending,
-      inProgress,
-      delivered,
-      thisMonth,
+      total, pending, inProgress, delivered, thisMonth,
+      provisionAgg, disbursementAgg, unpaidAgg,
+      containers, containersAtPort, containersInTransit, containersDelivered,
+      recentShipments,
+      workflowAlerts,
     ] = await Promise.all([
+      // Shipment counts
       prisma.shipment.count({ where: { companyId } }),
-      prisma.shipment.count({
-        where: { companyId, status: { in: ['PENDING', 'DRAFT'] } },
-      }),
+      prisma.shipment.count({ where: { companyId, status: { in: ['PENDING', 'DRAFT'] } } }),
       prisma.shipment.count({
         where: {
           companyId,
           status: {
-            in: [
-              'ARRIVED', 'DDI_OBTAINED', 'DECLARATION_FILED',
+            in: ['ARRIVED', 'DDI_OBTAINED', 'DECLARATION_FILED',
               'LIQUIDATION_ISSUED', 'CUSTOMS_PAID', 'BAE_ISSUED',
-              'TERMINAL_PAID', 'DO_RELEASED', 'EXIT_NOTE_ISSUED',
-              'IN_DELIVERY',
-            ],
+              'TERMINAL_PAID', 'DO_RELEASED', 'EXIT_NOTE_ISSUED', 'IN_DELIVERY'],
           },
         },
       }),
-      prisma.shipment.count({
-        where: { companyId, status: 'DELIVERED' },
-      }),
+      prisma.shipment.count({ where: { companyId, status: 'DELIVERED' } }),
       prisma.shipment.count({
         where: {
           companyId,
-          createdAt: {
-            gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+          createdAt: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) },
+        },
+      }),
+      // Financial aggregation
+      prisma.expense.aggregate({ where: { type: 'PROVISION', shipment: { companyId } }, _sum: { amount: true } }),
+      prisma.expense.aggregate({ where: { type: 'DISBURSEMENT', shipment: { companyId } }, _sum: { amount: true } }),
+      prisma.expense.aggregate({ where: { type: 'DISBURSEMENT', paid: false, shipment: { companyId } }, _sum: { amount: true } }),
+      // Container counts
+      prisma.container.count({ where: { shipment: { companyId } } }),
+      prisma.container.count({
+        where: {
+          shipment: {
+            companyId,
+            status: { in: ['ARRIVED', 'DDI_OBTAINED', 'DECLARATION_FILED',
+              'LIQUIDATION_ISSUED', 'CUSTOMS_PAID', 'BAE_ISSUED',
+              'TERMINAL_PAID', 'DO_RELEASED', 'EXIT_NOTE_ISSUED'] },
           },
         },
       }),
-    ]);
-
-    // Financial aggregation
-    const [provisionAgg, disbursementAgg, unpaidAgg] = await Promise.all([
-      prisma.expense.aggregate({
-        where: {
-          type: 'PROVISION',
-          shipment: { companyId },
-        },
-        _sum: { amount: true },
+      prisma.container.count({ where: { shipment: { companyId, status: 'IN_DELIVERY' } } }),
+      prisma.container.count({
+        where: { shipment: { companyId, status: { in: ['DELIVERED', 'INVOICED', 'CLOSED', 'ARCHIVED'] } } },
       }),
-      prisma.expense.aggregate({
-        where: {
-          type: 'DISBURSEMENT',
-          shipment: { companyId },
-        },
-        _sum: { amount: true },
+      // Recent shipments
+      prisma.shipment.findMany({
+        where: { companyId },
+        include: { containers: true, createdBy: { select: { id: true, name: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
       }),
-      prisma.expense.aggregate({
-        where: {
-          type: 'DISBURSEMENT',
-          paid: false,
-          shipment: { companyId },
-        },
-        _sum: { amount: true },
-      }),
+      // Alerts
+      generateAlerts(companyId),
     ]);
 
     const totalProvisions = provisionAgg._sum.amount || 0;
     const totalDisbursements = disbursementAgg._sum.amount || 0;
     const unpaid = unpaidAgg._sum.amount || 0;
-
-    // Container stats
-    const containers = await prisma.container.count({
-      where: { shipment: { companyId } },
-    });
-
-    const containersAtPort = await prisma.container.count({
-      where: {
-        shipment: {
-          companyId,
-          status: {
-            in: ['ARRIVED', 'DDI_OBTAINED', 'DECLARATION_FILED',
-              'LIQUIDATION_ISSUED', 'CUSTOMS_PAID', 'BAE_ISSUED',
-              'TERMINAL_PAID', 'DO_RELEASED', 'EXIT_NOTE_ISSUED'],
-          },
-        },
-      },
-    });
-
-    const containersInTransit = await prisma.container.count({
-      where: {
-        shipment: { companyId, status: 'IN_DELIVERY' },
-      },
-    });
-
-    const containersDelivered = await prisma.container.count({
-      where: {
-        shipment: {
-          companyId,
-          status: { in: ['DELIVERED', 'INVOICED', 'CLOSED', 'ARCHIVED'] },
-        },
-      },
-    });
-
-    // Recent shipments
-    const recentShipments = await prisma.shipment.findMany({
-      where: { companyId },
-      include: { containers: true, createdBy: { select: { id: true, name: true } } },
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-    });
-
-    // Smart alerts from workflow engine
-    const workflowAlerts = await generateAlerts(companyId);
 
     // Add basic finance alerts
     const alerts: Array<{ id: string; type: string; message: string; shipmentId?: string; category?: string }> = [];

@@ -29,6 +29,18 @@ class ApiClient {
   private isRefreshing = false;
   private refreshQueue: Array<() => void> = [];
 
+  // Retry config: retry on network errors and 502/503/504
+  private readonly MAX_RETRIES = 3;
+  private readonly RETRY_DELAYS = [1000, 2000, 4000]; // ms
+
+  private async sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  private isRetryable(status: number): boolean {
+    return status === 0 || status === 502 || status === 503 || status === 504;
+  }
+
   private async request<T>(
     method: string,
     endpoint: string,
@@ -47,37 +59,62 @@ class ApiClient {
       options.body = JSON.stringify(data);
     }
 
-    try {
-      const response = await fetch(url, options);
-      const json = await response.json().catch(() => ({}));
+    let lastError: ApiError | null = null;
 
-      if (!response.ok) {
-        // Handle token expiration
-        if (response.status === 401 && json.code === 'TOKEN_EXPIRED' && !isRetry) {
-          return this.handleTokenRefresh<T>(method, endpoint, data);
+    for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
+      try {
+        // Wait before retrying (not on first attempt)
+        if (attempt > 0) {
+          await this.sleep(this.RETRY_DELAYS[attempt - 1] || 4000);
         }
 
-        throw new ApiError(
-          json.message || 'Une erreur est survenue',
-          response.status,
-          json.code,
-          json.errors
-        );
-      }
+        const response = await fetch(url, options);
+        const json = await response.json().catch(() => ({}));
 
-      return { data: json.data || json, success: true };
-    } catch (error) {
-      if (error instanceof ApiError) throw error;
-      
-      // Enhanced error message for network errors
-      const isLocalhost = API_BASE.includes('localhost');
-      const errorMessage = isLocalhost && !import.meta.env.DEV
-        ? '❌ API non accessible. Configurez VITE_API_URL sur Vercel avec votre URL Railway.'
-        : 'Erreur de connexion au serveur';
-      
-      console.error('API Request Failed:', { url, error, isLocalhost });
-      throw new ApiError(errorMessage, 0);
+        if (!response.ok) {
+          // Retry on 502/503/504 (server temporarily unavailable)
+          if (this.isRetryable(response.status) && attempt < this.MAX_RETRIES) {
+            lastError = new ApiError(json.message || 'Serveur indisponible', response.status);
+            continue;
+          }
+
+          // Handle token expiration
+          if (response.status === 401 && json.code === 'TOKEN_EXPIRED' && !isRetry) {
+            return this.handleTokenRefresh<T>(method, endpoint, data);
+          }
+
+          throw new ApiError(
+            json.message || 'Une erreur est survenue',
+            response.status,
+            json.code,
+            json.errors
+          );
+        }
+
+        return { data: json.data || json, success: true };
+      } catch (error) {
+        if (error instanceof ApiError && !this.isRetryable(error.status)) throw error;
+
+        // Network error (fetch failed) — retry
+        if (attempt < this.MAX_RETRIES) {
+          lastError = error instanceof ApiError ? error : new ApiError('Erreur réseau', 0);
+          continue;
+        }
+
+        if (error instanceof ApiError) throw error;
+
+        // Enhanced error message for network errors
+        const isLocalhost = API_BASE.includes('localhost');
+        const errorMessage = isLocalhost && !import.meta.env.DEV
+          ? '❌ API non accessible. Configurez VITE_API_URL sur Vercel avec votre URL Railway.'
+          : 'Erreur de connexion au serveur';
+
+        console.error('API Request Failed:', { url, error, isLocalhost });
+        throw new ApiError(errorMessage, 0);
+      }
     }
+
+    throw lastError || new ApiError('Erreur de connexion au serveur', 0);
   }
 
   private async handleTokenRefresh<T>(
