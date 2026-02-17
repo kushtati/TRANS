@@ -47,21 +47,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
     loadShipments();
   }, [debouncedSearch, statusFilter]);
 
-  const loadStats = async (retry = true) => {
+  const loadStats = async () => {
     try {
       const res = await api.get<{ stats: DashboardStats }>('/shipments/stats');
       if (res.data?.stats) setStats(res.data.stats);
-    } catch (error: any) {
-      // Retry once on 401 (cookie may not be stored yet after login on mobile)
-      if (retry && error?.status === 401) {
-        setTimeout(() => loadStats(false), 500);
-        return;
-      }
+    } catch (error) {
       console.error('Failed to load stats:', error);
     }
   };
 
-  const loadShipments = async (retry = true) => {
+  const loadShipments = async () => {
     setIsLoading(true);
     try {
       const params = new URLSearchParams({ limit: '20' });
@@ -72,11 +67,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         `/shipments?${params.toString()}`
       );
       if (res.data?.shipments) setShipments(res.data.shipments);
-    } catch (error: any) {
-      if (retry && error?.status === 401) {
-        setTimeout(() => loadShipments(false), 500);
-        return;
-      }
+    } catch (error) {
       console.error('Failed to load shipments:', error);
     } finally {
       setIsLoading(false);

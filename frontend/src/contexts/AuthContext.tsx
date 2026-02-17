@@ -1,7 +1,7 @@
 // src/contexts/AuthContext.tsx
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { api } from '../lib/api';
+import { api, clearTokens } from '../lib/api';
 import type { User } from '../types';
 
 interface AuthState {
@@ -47,6 +47,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       // Logout even if API call fails
     } finally {
+      clearTokens();
       setUser(null);
     }
   }, []);

@@ -25,6 +25,24 @@ export class ApiError extends Error {
   getFieldError = (field: string) => this.errors?.find(e => e.field === field)?.message;
 }
 
+// In-memory token storage (works even when Safari blocks third-party cookies)
+let _accessToken: string | null = null;
+let _refreshToken: string | null = null;
+
+export function setTokens(accessToken: string, refreshToken: string): void {
+  _accessToken = accessToken;
+  _refreshToken = refreshToken;
+}
+
+export function clearTokens(): void {
+  _accessToken = null;
+  _refreshToken = null;
+}
+
+export function hasToken(): boolean {
+  return _accessToken !== null;
+}
+
 class ApiClient {
   private isRefreshing = false;
   private refreshQueue: Array<() => void> = [];
@@ -49,10 +67,19 @@ class ApiClient {
   ): Promise<{ data?: T; success: boolean }> {
     const url = `${API_BASE}${endpoint}`;
 
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    // Add Bearer token for mobile browsers that block third-party cookies
+    if (_accessToken) {
+      headers['Authorization'] = `Bearer ${_accessToken}`;
+    }
+
     const options: RequestInit = {
       method,
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include', // Important pour les cookies cross-origin
+      headers,
+      credentials: 'include', // Still send cookies when available (desktop)
     };
 
     if (data) {
@@ -89,6 +116,13 @@ class ApiClient {
             json.code,
             json.errors
           );
+        }
+
+        // Store tokens if returned in response (login, refresh, verify-email)
+        if (json.data?.accessToken) {
+          setTokens(json.data.accessToken, json.data.refreshToken);
+        } else if (json.accessToken) {
+          setTokens(json.accessToken, json.refreshToken);
         }
 
         return { data: json.data || json, success: true };
@@ -133,15 +167,34 @@ class ApiClient {
     this.isRefreshing = true;
 
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (_accessToken) {
+        headers['Authorization'] = `Bearer ${_accessToken}`;
+      }
+
       const refreshResponse = await fetch(`${API_BASE}/auth/refresh`, {
         method: 'POST',
+        headers,
         credentials: 'include',
+        // Send refresh token in body for mobile browsers that block cookies
+        body: _refreshToken ? JSON.stringify({ refreshToken: _refreshToken }) : undefined,
       });
 
       if (!refreshResponse.ok) {
-        // Session expirée - rediriger vers login
+        clearTokens();
         window.location.href = '/';
         throw new ApiError('Session expirée', 401);
+      }
+
+      const refreshJson = await refreshResponse.json().catch(() => ({}));
+
+      // Store new tokens
+      if (refreshJson.accessToken) {
+        setTokens(refreshJson.accessToken, refreshJson.refreshToken);
+      } else if (refreshJson.data?.accessToken) {
+        setTokens(refreshJson.data.accessToken, refreshJson.data.refreshToken);
       }
 
       // Retry original request

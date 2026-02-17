@@ -67,11 +67,9 @@ export default function App() {
     setCurrentView('edit');
   }, []);
 
-  const handleAuthSuccess = useCallback(async (userData: User) => {
-    // Wait for browser to process Set-Cookie from login response
-    // Prevents 401 race condition on mobile where Dashboard API calls
-    // fire before the auth cookie is stored
-    await new Promise(r => setTimeout(r, 150));
+  const handleAuthSuccess = useCallback((userData: User) => {
+    // Tokens are now stored in memory by api.ts (from login response body)
+    // No delay needed — Authorization header is used instead of cookies
     setUser(userData);
     toast.success('Bienvenue !');
   }, [setUser, toast]);

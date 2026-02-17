@@ -251,6 +251,8 @@ router.post('/verify-email', async (req: Request, res: Response) => {
             name: user.company.name,
           },
         },
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
       },
     });
   } catch (error) {
@@ -432,6 +434,9 @@ router.post('/login', async (req: Request, res: Response) => {
             name: user.company.name,
           },
         },
+        // Also return tokens in body for mobile browsers that block third-party cookies
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
       },
     });
   } catch (error) {
@@ -453,7 +458,8 @@ router.post('/login', async (req: Request, res: Response) => {
 
 router.post('/refresh', async (req: Request, res: Response) => {
   try {
-    const refreshToken = req.cookies?.refreshToken;
+    // Accept refresh token from cookie OR request body (mobile Safari blocks third-party cookies)
+    const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
 
     if (!refreshToken) {
       return res.status(401).json({
@@ -511,7 +517,11 @@ router.post('/refresh', async (req: Request, res: Response) => {
     // Set cookies with new tokens
     setAuthCookies(res, tokens);
 
-    res.json({ success: true });
+    res.json({
+      success: true,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    });
   } catch (error) {
     clearAuthCookies(res);
     res.status(401).json({
