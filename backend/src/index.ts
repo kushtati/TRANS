@@ -70,7 +70,7 @@ app.use(cookieParser());
 // Rate limiting
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: isProduction ? 200 : 1000,
+  max: isProduction ? 500 : 1000,
   message: { success: false, message: 'Trop de requêtes, réessayez plus tard' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -153,6 +153,18 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
     success: false,
     message: isProduction ? 'Erreur interne du serveur' : err.message,
   });
+});
+
+// ============================================
+// Crash protection — prevent 502s from unhandled errors
+// ============================================
+
+process.on('uncaughtException', (error) => {
+  log.error('Uncaught exception (process kept alive)', error);
+});
+
+process.on('unhandledRejection', (reason) => {
+  log.error('Unhandled rejection (process kept alive)', reason as Error);
 });
 
 // ============================================
