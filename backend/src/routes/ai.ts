@@ -20,9 +20,9 @@ const aiLimiter = rateLimit({
 });
 router.use(aiLimiter);
 
-// Gemini client (2.5-flash remplace 1.5-flash, retiré par Google)
+// Gemini client (2.0-flash : stable, rapide, multimodal)
 const genAI = env.GEMINI_API_KEY ? new GoogleGenerativeAI(env.GEMINI_API_KEY) : null;
-const model = genAI?.getGenerativeModel({ model: 'gemini-2.5-flash' });
+const model = genAI?.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
 // Schemas
 const chatSchema = z.object({
@@ -53,7 +53,7 @@ Réponds de manière concise en français. Utilise des montants en GNF.`;
 router.get('/status', (req: Request, res: Response) => {
   res.json({
     success: true,
-    data: { available: !!model, model: model ? 'gemini-2.5-flash' : null },
+    data: { available: !!model, model: model ? 'gemini-2.0-flash' : null },
   });
 });
 
