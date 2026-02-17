@@ -29,7 +29,7 @@ export const CreateShipmentForm: React.FC<CreateShipmentFormProps> = ({ onSucces
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    if (f.size > 15 * 1024 * 1024) { setError('Fichier trop lourd (max 15 Mo)'); return; }
+    if (f.size > 5 * 1024 * 1024) { setError('Fichier trop lourd (max 5 Mo)'); return; }
     setBlFile(f); setError(''); setExtractionMessage('');
   };
 
@@ -41,7 +41,32 @@ export const CreateShipmentForm: React.FC<CreateShipmentFormProps> = ({ onSucces
     try {
       const fd = new window.FormData(); fd.append('file', blFile);
       const base = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-      const resp = await fetch(`${base}/ai/extract-bl`, { method: 'POST', credentials: 'include', body: fd });
+      const url = `${base}/ai/extract-bl`;
+
+      // Retry logic (max 2 retries on 502/503/504/network error)
+      let resp: Response | null = null;
+      const delays = [2000, 4000];
+      for (let attempt = 0; attempt <= 2; attempt++) {
+        try {
+          if (attempt > 0) {
+            setExtractionMessage(`Nouvelle tentative (${attempt}/2)...`);
+            await new Promise(r => setTimeout(r, delays[attempt - 1]));
+            // Rebuild FormData (body consumed after first fetch)
+            const retryFd = new window.FormData();
+            retryFd.append('file', blFile);
+            resp = await fetch(url, { method: 'POST', credentials: 'include', body: retryFd });
+          } else {
+            resp = await fetch(url, { method: 'POST', credentials: 'include', body: fd });
+          }
+          if (resp.ok || (resp.status < 500 && resp.status !== 0)) break;
+          if (attempt < 2 && [502, 503, 504].includes(resp.status)) continue;
+          break;
+        } catch (netErr) {
+          if (attempt >= 2) throw netErr;
+        }
+      }
+
+      if (!resp) throw new Error('Erreur réseau');
       const result = await resp.json();
       if (!resp.ok) throw new Error(result.message || 'Erreur extraction');
       const { extracted, fileUrl, message } = result.data;
@@ -49,7 +74,7 @@ export const CreateShipmentForm: React.FC<CreateShipmentFormProps> = ({ onSucces
       if (extracted) {
         applyExtracted(extracted);
         setExtractionMessage(message || 'Données extraites avec succès !');
-                setTimeout(() => setStep(1), 800);
+        setTimeout(() => setStep(1), 800);
       } else {
         setExtractionMessage(message || 'Remplissez les champs manuellement.');
         setStep(1);

@@ -181,7 +181,7 @@ import path from 'path';
 
 const blUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 15 * 1024 * 1024 },
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB max — évite OOM sur Railway
   fileFilter: (_req, file, cb) => {
     const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
     cb(null, allowed.includes(file.mimetype));
@@ -247,12 +247,16 @@ router.post('/extract-bl', blUpload.single('file'), async (req: Request, res: Re
       });
     }
 
+    const mimeType = req.file.mimetype;
+    const originalName = req.file.originalname;
+    const fileSize = req.file.size;
+
     // Save file to uploads folder for later attachment to shipment
     const UPLOAD_DIR = path.resolve(process.cwd(), 'uploads');
     if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-    const ext = path.extname(req.file.originalname);
-    const safeName = req.file.originalname
+    const ext = path.extname(originalName);
+    const safeName = originalName
       .replace(ext, '')
       .replace(/[^a-zA-Z0-9_-]/g, '_')
       .substring(0, 50);
@@ -260,31 +264,35 @@ router.post('/extract-bl', blUpload.single('file'), async (req: Request, res: Re
     fs.writeFileSync(path.join(UPLOAD_DIR, filename), req.file.buffer);
     const fileUrl = `/api/upload/files/${filename}`;
 
-    // Convert to base64 for Gemini multimodal
+    // Convert to base64 then free the buffer immediately
     const base64Data = req.file.buffer.toString('base64');
+    (req as any).file = null; // Free multer buffer from memory
 
     log.info('BL extraction started', {
       userId: req.user!.id,
-      filename: req.file.originalname,
-      size: req.file.size,
-      mimeType: req.file.mimetype,
+      filename: originalName,
+      size: fileSize,
+      mimeType,
     });
 
-    // Send to Gemini using explicit contents format (more compatible)
-    const result = await model.generateContent({
-      contents: [{
-        role: 'user',
-        parts: [
-          {
-            inlineData: {
-              mimeType: req.file.mimetype,
-              data: base64Data,
-            },
-          },
-          { text: BL_EXTRACTION_PROMPT },
-        ],
-      }],
-    });
+    // Send to Gemini with 30s timeout to prevent Railway killing the process
+    const abortController = new AbortController();
+    const timeout = setTimeout(() => abortController.abort(), 30000);
+
+    let result;
+    try {
+      result = await model.generateContent({
+        contents: [{
+          role: 'user',
+          parts: [
+            { inlineData: { mimeType, data: base64Data } },
+            { text: BL_EXTRACTION_PROMPT },
+          ],
+        }],
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
 
     const response = result.response;
 
@@ -319,7 +327,6 @@ router.post('/extract-bl', blUpload.single('file'), async (req: Request, res: Re
     }
 
     if (extracted) {
-      // Count non-empty fields for the message
       const filledCount = Object.entries(extracted).filter(([k, v]) => {
         if (k === 'containers') return Array.isArray(v) && (v as any[]).length > 0;
         if (typeof v === 'string') return v.trim() !== '';
@@ -357,14 +364,15 @@ router.post('/extract-bl', blUpload.single('file'), async (req: Request, res: Re
     const errMsg = error?.message || String(error);
     log.error('BL extraction error', { message: errMsg, stack: error?.stack });
 
-    // Provide specific error messages
     let userMessage = 'Erreur lors de l\'extraction. Réessayez ou remplissez manuellement.';
     if (errMsg.includes('API_KEY')) {
       userMessage = 'Clé API Gemini invalide. Vérifiez GEMINI_API_KEY.';
     } else if (errMsg.includes('quota') || errMsg.includes('429')) {
       userMessage = 'Limite de requêtes IA atteinte. Réessayez dans quelques minutes.';
     } else if (errMsg.includes('size') || errMsg.includes('too large')) {
-      userMessage = 'Fichier trop volumineux pour l\'analyse IA. Essayez un fichier plus petit.';
+      userMessage = 'Fichier trop volumineux (max 5 Mo). Essayez un fichier plus petit.';
+    } else if (errMsg.includes('abort') || errMsg.includes('timeout')) {
+      userMessage = 'L\'analyse a pris trop de temps. Réessayez avec un fichier plus petit.';
     }
 
     res.status(500).json({
