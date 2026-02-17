@@ -183,17 +183,25 @@ export async function generateAlerts(companyId: string): Promise<Alert[]> {
   const alerts: Alert[] = [];
   const now = new Date();
 
-  // Get active shipments
+  // Get active shipments (limit to 30, select only needed fields to reduce memory)
   const shipments = await prisma.shipment.findMany({
     where: {
       companyId,
       status: { notIn: ['DELIVERED', 'INVOICED', 'CLOSED', 'ARCHIVED'] },
     },
-    include: {
+    select: {
+      id: true,
+      trackingNumber: true,
+      status: true,
+      eta: true,
+      ata: true,
+      vesselName: true,
+      updatedAt: true,
       documents: { select: { type: true } },
       expenses: { select: { type: true, paid: true, amount: true } },
-      containers: { select: { id: true } },
     },
+    orderBy: { updatedAt: 'desc' },
+    take: 30,
   });
 
   for (const s of shipments) {
