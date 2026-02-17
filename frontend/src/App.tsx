@@ -16,6 +16,7 @@ import { ForgotPasswordScreen } from './components/auth/ForgotPasswordScreen';
 import { AppLayout } from './components/layout/AppLayout';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { Loader2 } from 'lucide-react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 // Lazy-loaded views (code-split for performance on 3G — U6)
 const Dashboard = lazy(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard })));
@@ -228,18 +229,21 @@ export default function App() {
   };
 
   return (
-    <AppLayout
-      user={user}
-      currentView={currentView}
-      onNavigate={setCurrentView}
-      onLogout={handleLogout}
-      onSearch={handleSearch}
-    >
-      <ErrorBoundary>
-        <Suspense fallback={<ViewLoader />}>
-          {renderView()}
-        </Suspense>
-      </ErrorBoundary>
-    </AppLayout>
+    <>
+      <AppLayout
+        user={user}
+        currentView={currentView}
+        onNavigate={setCurrentView}
+        onLogout={handleLogout}
+        onSearch={handleSearch}
+      >
+        <ErrorBoundary>
+          <Suspense fallback={<ViewLoader />}>
+            {renderView()}
+          </Suspense>
+        </ErrorBoundary>
+      </AppLayout>
+      <SpeedInsights />
+    </>
   );
 }
