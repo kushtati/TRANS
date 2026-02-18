@@ -108,7 +108,13 @@ export const requireRole = (...allowedRoles: Role[]) => {
  */
 export const optionalAuth = (req: Request, _res: Response, next: NextFunction): void => {
   try {
-    const token = req.cookies?.accessToken;
+    let token = req.cookies?.accessToken;
+    if (!token) {
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith('Bearer ')) {
+        token = authHeader.slice(7);
+      }
+    }
     if (token) {
       const decoded = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
       req.user = {

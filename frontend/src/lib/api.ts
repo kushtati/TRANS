@@ -25,18 +25,39 @@ export class ApiError extends Error {
   getFieldError = (field: string) => this.errors?.find(e => e.field === field)?.message;
 }
 
-// In-memory token storage (works even when Safari blocks third-party cookies)
+// Token storage — persisted in localStorage so sessions survive page refresh
+// (critical for mobile Safari which blocks cross-origin cookies)
 let _accessToken: string | null = null;
 let _refreshToken: string | null = null;
+
+// Restore tokens from localStorage on load
+try {
+  _accessToken = localStorage.getItem('_at');
+  _refreshToken = localStorage.getItem('_rt');
+} catch {
+  // localStorage unavailable (private browsing, etc.)
+}
 
 export function setTokens(accessToken: string, refreshToken: string): void {
   _accessToken = accessToken;
   _refreshToken = refreshToken;
+  try {
+    localStorage.setItem('_at', accessToken);
+    localStorage.setItem('_rt', refreshToken);
+  } catch {
+    // localStorage unavailable
+  }
 }
 
 export function clearTokens(): void {
   _accessToken = null;
   _refreshToken = null;
+  try {
+    localStorage.removeItem('_at');
+    localStorage.removeItem('_rt');
+  } catch {
+    // localStorage unavailable
+  }
 }
 
 export function hasToken(): boolean {
