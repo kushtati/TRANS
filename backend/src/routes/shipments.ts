@@ -302,6 +302,20 @@ router.post('/', requireRole('DIRECTOR', 'AGENT'), async (req: Request, res: Res
     const userId = req.user!.id;
     const companyId = req.user!.companyId;
 
+    // Check BL number uniqueness within the company
+    if (data.blNumber && data.blNumber.trim()) {
+      const existing = await prisma.shipment.findFirst({
+        where: { blNumber: data.blNumber.trim(), companyId },
+        select: { id: true, trackingNumber: true },
+      });
+      if (existing) {
+        return res.status(409).json({
+          success: false,
+          message: `Ce numéro BL est déjà utilisé dans le dossier ${existing.trackingNumber}`,
+        });
+      }
+    }
+
     const trackingNumber = await generateTrackingNumber(companyId);
 
     // Parse ETA date if provided
@@ -577,6 +591,21 @@ router.post('/:id/documents', async (req: Request, res: Response) => {
 
     if (!shipment) {
       return res.status(404).json({ success: false, message: 'Dossier non trouvé' });
+    }
+
+    // Check if a document of this type already exists for this shipment
+    // (except for OTHER type which can have multiples)
+    if (data.type !== 'OTHER') {
+      const existingDoc = await prisma.document.findFirst({
+        where: { shipmentId: shipment.id, type: data.type as any },
+        select: { id: true, name: true },
+      });
+      if (existingDoc) {
+        return res.status(409).json({
+          success: false,
+          message: `Un document de type "${data.type}" existe déjà pour ce dossier (${existingDoc.name}). Supprimez-le d'abord pour le remplacer.`,
+        });
+      }
     }
 
     const document = await prisma.document.create({

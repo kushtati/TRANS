@@ -351,7 +351,7 @@ const Sec: React.FC<{title:string;icon:React.ReactNode;children:React.ReactNode;
 
 const Inp: React.FC<{label:string;value:string;onChange:(e:React.ChangeEvent<HTMLInputElement>)=>void;placeholder?:string;type?:string;required?:boolean;small?:boolean;highlight?:boolean}> = ({label,value,onChange,placeholder,type='text',required,small,highlight}) => (
   <div>
-    <label className={`block text-slate-600 mb-1 ${small?'text-xs':'text-sm'}`}>{label}{required && <span className="text-red-500"> *</span>}{highlight && <span className="ml-1 text-green-500 text-xs">✨ auto</span>}</label>
+    <label className={`block text-slate-600 mb-1 ${small?'text-xs':'text-sm'}`}>{label}{required && <span className="text-red-500"> *</span>}</label>
     <input type={type} value={value} onChange={onChange} placeholder={placeholder} className={`w-full bg-white border border-slate-300 rounded-lg px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 ${small?'py-2 text-sm':'py-2.5'} ${highlight?'ring-2 ring-green-300 bg-green-50/30 border-green-300':''}`} />
   </div>
 );
@@ -364,7 +364,7 @@ const Sel: React.FC<{label:string;value:string;onChange:(e:React.ChangeEvent<HTM
 );
 
 const Sum: React.FC<{label:string;value:string;filled?:boolean}> = ({label,value,filled}) => (
-  <div className="flex justify-between"><span className="text-slate-500">{label}</span><span className={`font-medium ${filled?'text-green-700':'text-slate-900'}`}>{filled&&'✨ '}{value}</span></div>
+  <div className="flex justify-between"><span className="text-slate-500">{label}</span><span className={`font-medium ${filled?'text-green-700':'text-slate-900'}`}>{value}</span></div>
 );
 
 export default CreateShipmentForm;
