@@ -1,14 +1,15 @@
-// src/components/Dashboard.tsx
+// src/components/Dashboard.tsx — Ultra-modern enterprise dashboard
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Ship, Package, Clock, CheckCircle2, AlertTriangle,
   TrendingUp, TrendingDown, Plus, Search, RefreshCw,
-  ChevronRight, Anchor, FileText, Wallet, DollarSign
+  ChevronRight, Anchor, FileText, Wallet,
+  ArrowUpRight, ArrowDownRight, Activity,
+  Truck, CircleDollarSign, Zap
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useDebounce } from '../hooks/useDebounce';
-import { DashboardCharts } from './DashboardCharts';
 import type { Shipment, DashboardStats } from '../types';
 
 interface DashboardProps {
@@ -27,33 +28,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Sync external search from AppLayout
   useEffect(() => {
-    if (externalSearch !== undefined) {
-      setSearchQuery(externalSearch);
-    }
+    if (externalSearch !== undefined) setSearchQuery(externalSearch);
   }, [externalSearch]);
 
   const debouncedSearch = useDebounce(searchQuery, 400);
 
-  // Load stats once
-  useEffect(() => {
-    loadStats();
-  }, []);
-
-  // Reload shipments when search or filter changes
-  useEffect(() => {
-    loadShipments();
-  }, [debouncedSearch, statusFilter]);
+  useEffect(() => { loadStats(); }, []);
+  useEffect(() => { loadShipments(); }, [debouncedSearch, statusFilter]);
 
   const loadStats = async () => {
     try {
       const res = await api.get<{ stats: DashboardStats }>('/shipments/stats');
       if (res.data?.stats) setStats(res.data.stats);
-    } catch (error) {
-      console.error('Failed to load stats:', error);
-    }
+    } catch (e) { console.error('Stats error:', e); }
   };
 
   const loadShipments = async () => {
@@ -62,317 +52,335 @@ export const Dashboard: React.FC<DashboardProps> = ({
       const params = new URLSearchParams({ limit: '20' });
       if (statusFilter !== 'ALL') params.set('status', statusFilter);
       if (debouncedSearch) params.set('search', debouncedSearch);
-
-      const res = await api.get<{ shipments: Shipment[]; pagination: { total: number; pages: number } }>(
-        `/shipments?${params.toString()}`
-      );
+      const res = await api.get<{ shipments: Shipment[]; pagination: { total: number; pages: number } }>(`/shipments?${params}`);
       if (res.data?.shipments) setShipments(res.data.shipments);
-    } catch (error) {
-      console.error('Failed to load shipments:', error);
-    } finally {
-      setIsLoading(false);
-    }
+    } catch (e) { console.error('Shipments error:', e); }
+    finally { setIsLoading(false); }
   };
 
-  const formatAmount = (amount: number): string => {
-    if (amount >= 1_000_000_000) return `${(amount / 1_000_000_000).toFixed(1)} Md`;
-    if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1)} M`;
-    if (amount >= 1_000) return `${(amount / 1_000).toFixed(0)} K`;
-    return amount.toLocaleString();
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([loadStats(), loadShipments()]);
+    setTimeout(() => setRefreshing(false), 600);
   };
 
-  const getStatusConfig = (status: string) => {
-    const configs: Record<string, { label: string; color: string; bg: string }> = {
-      DRAFT: { label: 'Brouillon', color: 'text-slate-500', bg: 'bg-slate-100' },
-      PENDING: { label: 'En attente', color: 'text-amber-600', bg: 'bg-amber-50' },
-      ARRIVED: { label: 'Arrivé', color: 'text-blue-600', bg: 'bg-blue-50' },
-      DDI_OBTAINED: { label: 'DDI obtenue', color: 'text-blue-600', bg: 'bg-blue-50' },
-      DECLARATION_FILED: { label: 'Déclaré', color: 'text-indigo-600', bg: 'bg-indigo-50' },
-      LIQUIDATION_ISSUED: { label: 'Liquidé', color: 'text-purple-600', bg: 'bg-purple-50' },
-      CUSTOMS_PAID: { label: 'Droits payés', color: 'text-violet-600', bg: 'bg-violet-50' },
-      BAE_ISSUED: { label: 'BAE émis', color: 'text-cyan-600', bg: 'bg-cyan-50' },
-      TERMINAL_PAID: { label: 'Terminal payé', color: 'text-teal-600', bg: 'bg-teal-50' },
-      DO_RELEASED: { label: 'DO libéré', color: 'text-emerald-600', bg: 'bg-emerald-50' },
-      EXIT_NOTE_ISSUED: { label: 'Bon sortie', color: 'text-green-600', bg: 'bg-green-50' },
-      IN_DELIVERY: { label: 'En livraison', color: 'text-orange-600', bg: 'bg-orange-50' },
-      DELIVERED: { label: 'Livré', color: 'text-green-600', bg: 'bg-green-50' },
-      INVOICED: { label: 'Facturé', color: 'text-emerald-600', bg: 'bg-emerald-50' },
-      CLOSED: { label: 'Clôturé', color: 'text-slate-600', bg: 'bg-slate-100' },
-      ARCHIVED: { label: 'Archivé', color: 'text-slate-400', bg: 'bg-slate-50' },
-    };
-    return configs[status] || { label: status, color: 'text-slate-500', bg: 'bg-slate-100' };
+  const fmt = (n: number): string => {
+    if (n >= 1e9) return `${(n / 1e9).toFixed(1)}Md`;
+    if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
+    if (n >= 1e3) return `${(n / 1e3).toFixed(0)}K`;
+    return n.toLocaleString('fr-GN');
   };
 
-  const getRelativeTime = (dateString: string): string => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const minutes = Math.floor(diff / (1000 * 60));
-
-    if (days > 0) return `il y a ${days}j`;
-    if (hours > 0) return `il y a ${hours}h`;
-    if (minutes > 0) return `il y a ${minutes}min`;
-    return 'À l\'instant';
+  const statusMap: Record<string, { label: string; color: string; dot: string }> = {
+    DRAFT: { label: 'Brouillon', color: 'text-slate-500', dot: 'bg-slate-400' },
+    PENDING: { label: 'En attente', color: 'text-amber-600', dot: 'bg-amber-500' },
+    ARRIVED: { label: 'Arrivé', color: 'text-blue-600', dot: 'bg-blue-500' },
+    DDI_OBTAINED: { label: 'DDI obtenue', color: 'text-blue-600', dot: 'bg-blue-500' },
+    DECLARATION_FILED: { label: 'Déclaré', color: 'text-indigo-600', dot: 'bg-indigo-500' },
+    LIQUIDATION_ISSUED: { label: 'Liquidé', color: 'text-purple-600', dot: 'bg-purple-500' },
+    CUSTOMS_PAID: { label: 'Droits payés', color: 'text-violet-600', dot: 'bg-violet-500' },
+    BAE_ISSUED: { label: 'BAE émis', color: 'text-cyan-600', dot: 'bg-cyan-500' },
+    TERMINAL_PAID: { label: 'Terminal payé', color: 'text-teal-600', dot: 'bg-teal-500' },
+    DO_RELEASED: { label: 'DO libéré', color: 'text-emerald-600', dot: 'bg-emerald-500' },
+    EXIT_NOTE_ISSUED: { label: 'Bon sortie', color: 'text-green-600', dot: 'bg-green-500' },
+    IN_DELIVERY: { label: 'En livraison', color: 'text-orange-600', dot: 'bg-orange-500' },
+    DELIVERED: { label: 'Livré', color: 'text-green-600', dot: 'bg-green-500' },
+    INVOICED: { label: 'Facturé', color: 'text-emerald-600', dot: 'bg-emerald-500' },
+    CLOSED: { label: 'Clôturé', color: 'text-slate-600', dot: 'bg-slate-400' },
+    ARCHIVED: { label: 'Archivé', color: 'text-slate-400', dot: 'bg-slate-300' },
   };
 
-  // Filter shipments
-  // Server already filters — just display
-  const filteredShipments = shipments;
+  const timeAgo = (d: string) => {
+    const ms = Date.now() - new Date(d).getTime();
+    const m = Math.floor(ms / 60000), h = Math.floor(ms / 3600000), day = Math.floor(ms / 86400000);
+    if (day > 0) return `${day}j`;
+    if (h > 0) return `${h}h`;
+    if (m > 0) return `${m}min`;
+    return 'Now';
+  };
 
-  if (isLoading) {
+  // Pipeline KPI cards
+  const pipeline = useMemo(() => {
+    if (!stats) return [];
+    return [
+      { key: 'pending', label: 'En attente', count: stats.shipments.pending, color: 'from-amber-500 to-orange-500', icon: Clock },
+      { key: 'inProgress', label: 'En cours', count: stats.shipments.inProgress, color: 'from-blue-500 to-indigo-500', icon: Activity },
+      { key: 'delivered', label: 'Livrés', count: stats.shipments.delivered, color: 'from-green-500 to-emerald-500', icon: CheckCircle2 },
+    ];
+  }, [stats]);
+
+  const balance = stats?.finance.balance || 0;
+  const provTotal = (stats?.finance.totalProvisions || 0) + (stats?.finance.totalDisbursements || 0);
+  const provPercent = provTotal > 0 ? Math.round(((stats?.finance.totalProvisions || 0) / provTotal) * 100) : 50;
+
+  // Skeleton
+  if (isLoading && !stats) {
     return (
-      <div className="p-4 space-y-4 max-w-7xl mx-auto">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-white rounded-xl p-4 animate-pulse">
-              <div className="h-4 w-20 bg-slate-200 rounded mb-2" />
-              <div className="h-8 w-16 bg-slate-200 rounded" />
-            </div>
-          ))}
+      <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6">
+        <div className="h-10 w-64 bg-slate-200 rounded-xl animate-pulse" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[1, 2, 3].map(i => <div key={i} className="h-36 bg-white rounded-2xl border border-slate-200 animate-pulse" />)}
         </div>
-        <div className="bg-white rounded-xl p-4 animate-pulse">
-          <div className="h-6 w-40 bg-slate-200 rounded mb-4" />
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-16 bg-slate-100 rounded-lg mb-2" />
-          ))}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-2 h-56 bg-white rounded-2xl border border-slate-200 animate-pulse" />
+          <div className="h-56 bg-white rounded-2xl border border-slate-200 animate-pulse" />
         </div>
+        <div className="h-64 bg-white rounded-2xl border border-slate-200 animate-pulse" />
       </div>
     );
   }
 
   return (
-    <div className="p-4 space-y-4 max-w-7xl mx-auto">
-      {/* Header */}
+    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6">
+
+      {/* ═══ HEADER ═══ */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Tableau de bord</h1>
-          <p className="text-sm text-slate-500">Vue d'ensemble de vos opérations</p>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Tableau de bord</h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            {stats?.shipments.thisMonth || 0} dossier{(stats?.shipments.thisMonth || 0) > 1 ? 's' : ''} ce mois
+          </p>
         </div>
-        <button
-          onClick={onCreateShipment}
-          className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-lg shadow-blue-500/30 transition-all"
-        >
-          <Plus size={18} />
-          <span className="hidden sm:inline">Nouveau dossier</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleRefresh}
+            className={`p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-all ${refreshing ? 'animate-spin' : ''}`}
+            title="Rafraîchir"
+          >
+            <RefreshCw size={16} className="text-slate-500" />
+          </button>
+          <button
+            onClick={onCreateShipment}
+            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-sm font-semibold shadow-lg shadow-blue-500/25 transition-all active:scale-[0.98]"
+          >
+            <Plus size={16} strokeWidth={2.5} />
+            <span className="hidden sm:inline">Nouveau dossier</span>
+          </button>
+        </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard
-          icon={<Ship size={20} />}
-          iconBg="bg-blue-100"
-          iconColor="text-blue-600"
-          label="En cours"
-          value={stats?.shipments.inProgress || 0}
-          subValue={`${stats?.shipments.total || 0} total`}
-        />
-        <StatCard
-          icon={<Clock size={20} />}
-          iconBg="bg-amber-100"
-          iconColor="text-amber-600"
-          label="En attente"
-          value={stats?.shipments.pending || 0}
-          subValue="À traiter"
-          alert={!!(stats?.shipments.pending && stats.shipments.pending > 5)}
-        />
-        <StatCard
-          icon={<CheckCircle2 size={20} />}
-          iconBg="bg-green-100"
-          iconColor="text-green-600"
-          label="Livrés"
-          value={stats?.shipments.delivered || 0}
-          subValue="Ce mois"
-        />
-        <StatCard
-          icon={<Wallet size={20} />}
-          iconBg="bg-violet-100"
-          iconColor="text-violet-600"
-          label="Solde"
-          value={`${formatAmount(stats?.finance.balance || 0)}`}
-          subValue="GNF disponible"
-          trend={stats?.finance.balance && stats.finance.balance > 0 ? 'up' : 'down'}
-        />
-      </div>
-
-      {/* Smart Alerts — vessel, document, finance, deadline */}
-      {stats?.alerts && stats.alerts.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-slate-700 px-1">
-            <AlertTriangle size={16} />
-            <span className="font-medium text-sm">Alertes ({stats.alerts.length})</span>
-          </div>
-          {stats.alerts.slice(0, 8).map((alert) => {
-            const colors: Record<string, string> = {
-              danger: 'bg-red-50 border-red-200',
-              warning: 'bg-amber-50 border-amber-200',
-              info: 'bg-blue-50 border-blue-200',
-            };
-            const textColors: Record<string, string> = {
-              danger: 'text-red-800',
-              warning: 'text-amber-800',
-              info: 'text-blue-800',
-            };
-            const icons: Record<string, React.ReactNode> = {
-              vessel: <Ship size={14} />,
-              document: <FileText size={14} />,
-              finance: <DollarSign size={14} />,
-              deadline: <Clock size={14} />,
-            };
-
-            return (
-              <div
-                key={alert.id}
-                className={`flex items-center gap-3 p-3 rounded-xl border ${colors[alert.type] || colors.info}`}
-              >
-                <div className={`shrink-0 ${textColors[alert.type] || textColors.info}`}>
-                  {icons[(alert as any).category] || <AlertTriangle size={14} />}
-                </div>
-                <span className={`text-sm flex-1 ${textColors[alert.type] || textColors.info}`}>
-                  {alert.message}
-                </span>
-                {alert.shipmentId && (
-                  <button
-                    onClick={() => onViewShipment(alert.shipmentId!)}
-                    className="text-xs text-blue-600 hover:underline font-medium shrink-0"
-                  >
-                    Voir
-                  </button>
-                )}
+      {/* ═══ KPI PIPELINE ═══ */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {pipeline.map((p) => (
+          <div
+            key={p.key}
+            className="relative overflow-hidden bg-white rounded-2xl border border-slate-200/80 p-5 hover:shadow-lg hover:shadow-slate-200/50 transition-all duration-300 group"
+          >
+            <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${p.color}`} />
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">{p.label}</p>
+                <p className="text-3xl font-bold text-slate-900 mt-1 tabular-nums">{p.count}</p>
+                <p className="text-xs text-slate-400 mt-1">
+                  sur {stats?.shipments.total || 0} dossiers
+                </p>
               </div>
-            );
-          })}
+              <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${p.color} flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform`}>
+                <p.icon size={20} className="text-white" />
+              </div>
+            </div>
+            <div className="mt-4 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className={`h-full bg-gradient-to-r ${p.color} rounded-full transition-all duration-1000 ease-out`}
+                style={{ width: `${Math.max((p.count / Math.max(stats?.shipments.total || 1, 1)) * 100, p.count > 0 ? 3 : 0)}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ═══ FINANCE + CONTAINERS ═══ */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+        {/* Finance Card */}
+        <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 p-5 hover:shadow-lg hover:shadow-slate-200/50 transition-all">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="font-semibold text-slate-900 flex items-center gap-2">
+              <CircleDollarSign size={18} className="text-slate-400" />
+              Aperçu financier
+            </h2>
+            <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${balance >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+              Solde: {balance >= 0 ? '+' : '-'}{fmt(Math.abs(balance))} GNF
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <FinanceMetric label="Provisions" value={stats?.finance.totalProvisions || 0} fmt={fmt} icon={<ArrowDownRight size={14} />} color="text-green-600" bg="bg-green-50" />
+            <FinanceMetric label="Débours" value={stats?.finance.totalDisbursements || 0} fmt={fmt} icon={<ArrowUpRight size={14} />} color="text-red-500" bg="bg-red-50" />
+            <FinanceMetric label="Impayés" value={stats?.finance.unpaid || 0} fmt={fmt} icon={<AlertTriangle size={14} />} color="text-amber-600" bg="bg-amber-50" alert={!!(stats?.finance.unpaid && stats.finance.unpaid > 0)} />
+            <FinanceMetric label="Solde net" value={Math.abs(balance)} fmt={fmt} icon={balance >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />} color={balance >= 0 ? 'text-green-600' : 'text-red-600'} bg={balance >= 0 ? 'bg-green-50' : 'bg-red-50'} />
+          </div>
+
+          {/* Provisions vs Disbursements bar */}
+          <div className="mt-5">
+            <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
+              <span>Provisions ({provPercent}%)</span>
+              <span>Débours ({100 - provPercent}%)</span>
+            </div>
+            <div className="h-3 bg-slate-100 rounded-full overflow-hidden flex">
+              <div className="h-full bg-gradient-to-r from-green-400 to-emerald-500 rounded-l-full transition-all duration-1000" style={{ width: `${provPercent}%` }} />
+              <div className="h-full bg-gradient-to-r from-red-400 to-rose-500 rounded-r-full transition-all duration-1000" style={{ width: `${100 - provPercent}%` }} />
+            </div>
+          </div>
+        </div>
+
+        {/* Containers Card */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 hover:shadow-lg hover:shadow-slate-200/50 transition-all">
+          <h2 className="font-semibold text-slate-900 flex items-center gap-2 mb-5">
+            <Package size={18} className="text-slate-400" />
+            Conteneurs
+          </h2>
+          <div className="space-y-4">
+            <ContainerRow label="Au port" value={stats?.containers.atPort || 0} total={stats?.containers.total || 0} color="bg-blue-500" icon={<Anchor size={14} />} />
+            <ContainerRow label="En transit" value={stats?.containers.inTransit || 0} total={stats?.containers.total || 0} color="bg-orange-500" icon={<Truck size={14} />} />
+            <ContainerRow label="Livrés" value={stats?.containers.delivered || 0} total={stats?.containers.total || 0} color="bg-green-500" icon={<CheckCircle2 size={14} />} />
+          </div>
+          <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
+            <span className="text-xs text-slate-400">Total</span>
+            <span className="text-lg font-bold text-slate-900 tabular-nums">{stats?.containers.total || 0} TC</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ═══ ALERTS ═══ */}
+      {stats?.alerts && stats.alerts.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold text-slate-900 flex items-center gap-2">
+              <Zap size={18} className="text-amber-500" />
+              Alertes
+              <span className="ml-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                {stats.alerts.length}
+              </span>
+            </h2>
+          </div>
+          <div className="space-y-2">
+            {stats.alerts.slice(0, 6).map((alert) => {
+              const cfg = {
+                danger: { bg: 'bg-red-50 border-red-100', text: 'text-red-700', icon: 'text-red-500' },
+                warning: { bg: 'bg-amber-50 border-amber-100', text: 'text-amber-700', icon: 'text-amber-500' },
+                info: { bg: 'bg-blue-50 border-blue-100', text: 'text-blue-700', icon: 'text-blue-500' },
+              }[alert.type] || { bg: 'bg-slate-50 border-slate-100', text: 'text-slate-700', icon: 'text-slate-500' };
+
+              return (
+                <div key={alert.id} className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${cfg.bg} transition-all hover:shadow-sm`}>
+                  <AlertTriangle size={14} className={`shrink-0 ${cfg.icon}`} />
+                  <span className={`text-sm flex-1 ${cfg.text}`}>{alert.message}</span>
+                  {alert.shipmentId && (
+                    <button onClick={() => onViewShipment(alert.shipmentId!)} className="text-xs font-medium text-blue-600 hover:text-blue-700 px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors">
+                      Voir
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
-      {/* Charts */}
-      {stats && <DashboardCharts stats={stats} />}
-
-      {/* Search & Filters */}
+      {/* ═══ SEARCH + FILTERS ═══ */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Rechercher (BL, client, tracking...)"
-            className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Rechercher par BL, client, tracking..."
+            className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400 transition-all"
           />
         </div>
-
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {['ALL', 'PENDING', 'CUSTOMS_PAID', 'DELIVERED'].map((filter) => (
+        <div className="flex gap-1.5 overflow-x-auto pb-1">
+          {[
+            { key: 'ALL', label: 'Tous' },
+            { key: 'PENDING', label: 'En attente' },
+            { key: 'ARRIVED', label: 'Arrivés' },
+            { key: 'CUSTOMS_PAID', label: 'Droits payés' },
+            { key: 'DELIVERED', label: 'Livrés' },
+          ].map((f) => (
             <button
-              key={filter}
-              onClick={() => setStatusFilter(filter)}
-              className={`px-4 py-2.5 rounded-xl text-xs font-medium whitespace-nowrap transition-colors ${
-                statusFilter === filter
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+              key={f.key}
+              onClick={() => setStatusFilter(f.key)}
+              className={`px-3.5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all ${
+                statusFilter === f.key
+                  ? 'bg-slate-900 text-white shadow-md'
+                  : 'bg-white text-slate-600 border border-slate-200 hover:border-slate-300 hover:bg-slate-50'
               }`}
             >
-              {filter === 'ALL' ? 'Tous' : 
-               filter === 'PENDING' ? 'En attente' :
-               filter === 'CUSTOMS_PAID' ? 'Droits payés' : 'Livrés'}
+              {f.label}
             </button>
           ))}
         </div>
-
-        <button
-          onClick={() => { loadStats(); loadShipments(); }}
-          className="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-        >
-          <RefreshCw size={18} className="text-slate-600" />
-        </button>
       </div>
 
-      {/* Shipments List */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-          <h2 className="font-semibold text-slate-900">Dossiers récents</h2>
-          <span className="text-sm text-slate-500">{filteredShipments.length} dossier(s)</span>
+      {/* ═══ SHIPMENT LIST ═══ */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <h2 className="font-semibold text-slate-900">Dossiers</h2>
+          <span className="text-xs text-slate-400 tabular-nums">{shipments.length} résultat{shipments.length > 1 ? 's' : ''}</span>
         </div>
 
-        {filteredShipments.length === 0 ? (
-          <div className="p-12 text-center">
-            <Package className="mx-auto text-slate-300 mb-4" size={56} />
-            <p className="text-slate-500 mb-1">Aucun dossier trouvé</p>
-            <p className="text-sm text-slate-400 mb-4">
+        {shipments.length === 0 ? (
+          <div className="py-16 text-center">
+            <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <Package size={28} className="text-slate-300" />
+            </div>
+            <p className="font-medium text-slate-500 mb-1">Aucun dossier trouvé</p>
+            <p className="text-sm text-slate-400 mb-5">
               {searchQuery ? 'Essayez une autre recherche' : 'Créez votre premier dossier de transit'}
             </p>
             {!searchQuery && (
-              <button
-                onClick={onCreateShipment}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium"
-              >
+              <button onClick={onCreateShipment} className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-colors">
                 Créer un dossier
               </button>
             )}
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
-            {filteredShipments.map((shipment) => {
-              const statusConfig = getStatusConfig(shipment.status);
-              
+          <div className="divide-y divide-slate-100/80">
+            {shipments.map((s) => {
+              const st = statusMap[s.status] || { label: s.status, color: 'text-slate-500', dot: 'bg-slate-400' };
+              const containers = s.containers || [];
+
               return (
                 <div
-                  key={shipment.id}
-                  onClick={() => onViewShipment(shipment.id)}
-                  className="p-4 hover:bg-slate-50 cursor-pointer transition-colors"
+                  key={s.id}
+                  onClick={() => onViewShipment(s.id)}
+                  className="px-5 py-4 hover:bg-slate-50/80 cursor-pointer transition-all group"
                 >
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
-                      {/* Header */}
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-semibold text-slate-900 truncate">
-                          {shipment.clientName}
-                        </span>
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig.bg} ${statusConfig.color}`}>
-                          {statusConfig.label}
-                        </span>
+                      <div className="flex items-center gap-2.5 mb-1.5">
+                        <h3 className="font-semibold text-slate-900 truncate group-hover:text-blue-600 transition-colors">
+                          {s.clientName}
+                        </h3>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className={`w-2 h-2 rounded-full ${st.dot}`} />
+                          <span className={`text-xs font-medium ${st.color}`}>{st.label}</span>
+                        </div>
                       </div>
-
-                      {/* Details */}
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
-                        <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded">{shipment.trackingNumber}</span>
-                        
-                        {shipment.blNumber && (
-                          <span className="flex items-center gap-1">
-                            <FileText size={12} />
-                            {shipment.blNumber}
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <span className="font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">{s.trackingNumber}</span>
+                        {s.blNumber && (
+                          <span className="flex items-center gap-1 text-slate-500">
+                            <FileText size={11} />{s.blNumber}
                           </span>
                         )}
-
-                        {shipment.vesselName && (
-                          <span className="flex items-center gap-1">
-                            <Anchor size={12} />
-                            {shipment.vesselName}
+                        {s.vesselName && (
+                          <span className="flex items-center gap-1 text-slate-500">
+                            <Ship size={11} />{s.vesselName}
                           </span>
                         )}
-
-                        {shipment.containers && shipment.containers.length > 0 && (
-                          <span className="flex items-center gap-1">
-                            <Package size={12} />
-                            {shipment.containers.length} TC
+                        {containers.length > 0 && (
+                          <span className="flex items-center gap-1 text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded">
+                            <Package size={11} />{containers.length} TC
                           </span>
                         )}
                       </div>
-
-                      {/* Description */}
-                      <p className="text-sm text-slate-600 mt-1.5 truncate">
-                        {shipment.description}
-                      </p>
+                      <p className="text-sm text-slate-500 mt-1.5 truncate">{s.description}</p>
                     </div>
-
-                    {/* Right */}
-                    <div className="flex flex-col items-end gap-1">
-                      <span className="text-xs text-slate-400">
-                        {getRelativeTime(shipment.createdAt)}
-                      </span>
-                      <ChevronRight size={18} className="text-slate-300" />
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                      <span className="text-[11px] text-slate-400 tabular-nums">{timeAgo(s.createdAt)}</span>
+                      <ChevronRight size={16} className="text-slate-300 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all" />
                     </div>
                   </div>
                 </div>
@@ -382,89 +390,44 @@ export const Dashboard: React.FC<DashboardProps> = ({
         )}
       </div>
 
-      {/* Quick Stats Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <QuickStatCard
-          label="Conteneurs au port"
-          value={stats?.containers.atPort || 0}
-          icon={<Package size={16} />}
-          color="text-blue-600"
-        />
-        <QuickStatCard
-          label="Débours impayés"
-          value={`${formatAmount(stats?.finance.unpaid || 0)} GNF`}
-          icon={<Wallet size={16} />}
-          color="text-red-600"
-          alert={!!(stats?.finance.unpaid && stats.finance.unpaid > 0)}
-        />
-        <QuickStatCard
-          label="Total provisions"
-          value={`${formatAmount(stats?.finance.totalProvisions || 0)} GNF`}
-          icon={<TrendingUp size={16} />}
-          color="text-green-600"
-        />
-        <QuickStatCard
-          label="Total débours"
-          value={`${formatAmount(stats?.finance.totalDisbursements || 0)} GNF`}
-          icon={<TrendingDown size={16} />}
-          color="text-orange-600"
-        />
-      </div>
     </div>
   );
 };
 
-// Sub-components
-interface StatCardProps {
-  icon: React.ReactNode;
-  iconBg: string;
-  iconColor: string;
-  label: string;
-  value: number | string;
-  subValue?: string;
-  trend?: 'up' | 'down';
-  alert?: boolean;
-}
+/* ═══════════ Sub-components ═══════════ */
 
-const StatCard: React.FC<StatCardProps> = ({
-  icon, iconBg, iconColor, label, value, subValue, trend, alert,
-}) => (
-  <div className={`bg-white rounded-xl p-4 border ${alert ? 'border-amber-300' : 'border-slate-200'}`}>
-    <div className="flex items-center gap-3">
-      <div className={`w-10 h-10 ${iconBg} rounded-xl flex items-center justify-center ${iconColor}`}>
-        {icon}
-      </div>
-      <div>
-        <p className="text-xs text-slate-500 uppercase tracking-wide">{label}</p>
-        <div className="flex items-center gap-2">
-          <span className="text-xl font-bold text-slate-900">{value}</span>
-          {trend && (
-            trend === 'up' 
-              ? <TrendingUp size={16} className="text-green-500" />
-              : <TrendingDown size={16} className="text-red-500" />
-          )}
-        </div>
-        {subValue && <p className="text-xs text-slate-400">{subValue}</p>}
-      </div>
+const FinanceMetric: React.FC<{
+  label: string; value: number; fmt: (n: number) => string;
+  icon: React.ReactNode; color: string; bg: string; alert?: boolean;
+}> = ({ label, value, fmt: format, icon, color, bg, alert }) => (
+  <div className={`rounded-xl p-3.5 ${bg} ${alert ? 'ring-1 ring-amber-300' : ''} transition-all`}>
+    <div className="flex items-center gap-1.5 mb-1">
+      <span className={color}>{icon}</span>
+      <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">{label}</span>
     </div>
+    <p className={`text-lg font-bold tabular-nums ${alert ? 'text-amber-700' : 'text-slate-900'}`}>
+      {format(value)} <span className="text-[10px] font-normal text-slate-400">GNF</span>
+    </p>
   </div>
 );
 
-interface QuickStatCardProps {
-  label: string;
-  value: string | number;
-  icon: React.ReactNode;
-  color: string;
-  alert?: boolean;
-}
-
-const QuickStatCard: React.FC<QuickStatCardProps> = ({ label, value, icon, color, alert }) => (
-  <div className={`bg-white rounded-xl p-3 border ${alert ? 'border-red-200 bg-red-50' : 'border-slate-200'}`}>
-    <div className="flex items-center gap-2 mb-1">
-      <span className={color}>{icon}</span>
-      <span className="text-xs text-slate-500">{label}</span>
+const ContainerRow: React.FC<{
+  label: string; value: number; total: number; color: string; icon: React.ReactNode;
+}> = ({ label, value, total, color, icon }) => (
+  <div>
+    <div className="flex items-center justify-between mb-1.5">
+      <div className="flex items-center gap-2 text-sm text-slate-600">
+        <span className="text-slate-400">{icon}</span>
+        {label}
+      </div>
+      <span className="text-sm font-semibold text-slate-900 tabular-nums">{value}</span>
     </div>
-    <p className={`font-semibold ${alert ? 'text-red-600' : 'text-slate-900'}`}>{value}</p>
+    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+      <div
+        className={`h-full ${color} rounded-full transition-all duration-700 ease-out`}
+        style={{ width: `${Math.max((value / Math.max(total, 1)) * 100, value > 0 ? 4 : 0)}%` }}
+      />
+    </div>
   </div>
 );
 

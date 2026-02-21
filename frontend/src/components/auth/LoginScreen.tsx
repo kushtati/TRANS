@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { 
   Mail, Lock, ArrowLeft, Loader2, Eye, EyeOff, 
-  AlertCircle, Zap 
+  AlertCircle 
 } from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
 import type { User } from '../../types';
@@ -27,22 +27,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // ============================================
-  // HANDLERS
-  // ============================================
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validation basique
-    if (!email.trim()) {
-      setError('Email requis');
-      return;
-    }
-    if (!password) {
-      setError('Mot de passe requis');
-      return;
-    }
+    if (!email.trim()) { setError('Email requis'); return; }
+    if (!password) { setError('Mot de passe requis'); return; }
 
     setIsLoading(true);
     setError('');
@@ -52,13 +40,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         email: email.trim().toLowerCase(),
         password,
       });
-
-      if (response.data?.user) {
-        onSuccess(response.data.user);
-      }
+      if (response.data?.user) onSuccess(response.data.user);
     } catch (err) {
       if (err instanceof ApiError) {
-        // Email non vérifié → rediriger vers vérification
         if (err.message.includes('non vérifié') || err.code === 'EMAIL_NOT_VERIFIED') {
           onNeedsVerification(email.trim().toLowerCase());
           return;
@@ -72,147 +56,95 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     }
   };
 
-  // ============================================
-  // RENDER
-  // ============================================
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col">
-      
+    <div className="min-h-screen relative flex flex-col overflow-hidden">
+
+      {/* Background */}
+      <div className="absolute inset-0">
+        <img src="/hero-bg.png" alt="" className="w-full h-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-b from-stone-900/70 via-stone-900/60 to-stone-950/90" />
+      </div>
+
       {/* Header */}
-      <div className="p-4 flex items-center gap-3">
-        <button
-          onClick={onBack}
-          className="p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 transition-colors"
-        >
+      <div className="p-4 flex items-center gap-3 relative z-10">
+        <button onClick={onBack}
+          className="p-2 rounded-full bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white transition-colors">
           <ArrowLeft size={20} />
         </button>
         <h1 className="text-white font-semibold">Connexion</h1>
       </div>
 
       {/* Content */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6">
+      <div className="flex-1 flex flex-col items-center justify-center p-6 relative z-10">
         <div className="w-full max-w-sm">
           
           {/* Logo */}
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-700 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/25">
-              <Zap size={32} className="text-white" fill="currentColor" />
+            <div className="w-20 h-20 mx-auto mb-4">
+              <img src="/logo.png" alt="E-Trans" className="w-full h-full object-contain" />
             </div>
             <h2 className="text-2xl font-bold text-white">Bienvenue</h2>
-            <p className="text-slate-400 text-sm mt-1">
-              Connectez-vous à votre compte
-            </p>
+            <p className="text-stone-300 text-sm mt-1">Connectez-vous à votre compte</p>
           </div>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             
-            {/* Error */}
             {error && (
-              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl flex items-center gap-2 text-red-400 text-sm animate-shake">
+              <div className="p-3 bg-red-500/15 border border-red-500/30 rounded-xl flex items-center gap-2 text-red-300 text-sm backdrop-blur-sm">
                 <AlertCircle size={18} className="flex-shrink-0" />
                 {error}
               </div>
             )}
 
-            {/* Email */}
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase mb-1.5">
-                Email
-              </label>
+              <label className="block text-xs font-semibold text-amber-200/80 uppercase mb-1.5">Email</label>
               <div className="relative">
-                <Mail className="absolute left-3 top-3.5 text-slate-500" size={18} />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={e => {
-                    setEmail(e.target.value);
-                    setError('');
-                  }}
-                  className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  placeholder="votre@email.com"
-                  autoComplete="email"
-                  autoFocus
-                />
+                <Mail className="absolute left-3 top-3.5 text-stone-400" size={18} />
+                <input type="email" value={email}
+                  onChange={e => { setEmail(e.target.value); setError(''); }}
+                  className="w-full bg-white/10 backdrop-blur-sm border border-white/20 text-white rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/30 transition-all placeholder:text-stone-500"
+                  placeholder="votre@email.com" autoComplete="email" autoFocus />
               </div>
             </div>
 
-            {/* Password */}
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase mb-1.5">
-                Mot de passe
-              </label>
+              <label className="block text-xs font-semibold text-amber-200/80 uppercase mb-1.5">Mot de passe</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-3.5 text-slate-500" size={18} />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={e => {
-                    setPassword(e.target.value);
-                    setError('');
-                  }}
-                  className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl pl-10 pr-12 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  placeholder="••••••••"
-                  autoComplete="current-password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3.5 text-slate-500 hover:text-slate-300 transition-colors"
-                >
+                <Lock className="absolute left-3 top-3.5 text-stone-400" size={18} />
+                <input type={showPassword ? 'text' : 'password'} value={password}
+                  onChange={e => { setPassword(e.target.value); setError(''); }}
+                  className="w-full bg-white/10 backdrop-blur-sm border border-white/20 text-white rounded-xl pl-10 pr-12 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/30 transition-all placeholder:text-stone-500"
+                  placeholder="••••••••" autoComplete="current-password" />
+                <button type="button" onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3.5 text-stone-400 hover:text-white transition-colors">
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
             </div>
 
-            {/* Forgot Password */}
             <div className="text-right">
-              <button
-                type="button"
-                className="text-sm text-slate-500 hover:text-blue-400 transition-colors"
-                onClick={() => {
-                  onForgotPassword?.();
-                }}
-              >
+              <button type="button" onClick={() => onForgotPassword?.()}
+                className="text-sm text-stone-400 hover:text-amber-400 transition-colors">
                 Mot de passe oublié ?
               </button>
             </div>
 
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-semibold rounded-xl transition-all disabled:opacity-60 flex items-center justify-center gap-2"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 size={20} className="animate-spin" />
-                  Connexion...
-                </>
-              ) : (
-                'Se connecter'
-              )}
+            <button type="submit" disabled={isLoading}
+              className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-bold rounded-xl transition-all disabled:opacity-60 flex items-center justify-center gap-2 shadow-lg shadow-amber-600/20 active:scale-[0.97]">
+              {isLoading ? (<><Loader2 size={20} className="animate-spin" /> Connexion...</>) : 'Se connecter'}
             </button>
-
           </form>
 
-          {/* Divider */}
           <div className="flex items-center gap-4 my-6">
-            <div className="flex-1 h-px bg-slate-700" />
-            <span className="text-slate-500 text-xs">OU</span>
-            <div className="flex-1 h-px bg-slate-700" />
+            <div className="flex-1 h-px bg-white/10" />
+            <span className="text-stone-500 text-xs">OU</span>
+            <div className="flex-1 h-px bg-white/10" />
           </div>
 
-          {/* Register Link */}
           <div className="text-center">
-            <p className="text-slate-500 text-sm">
-              Pas encore de compte ?
-            </p>
-            <button
-              onClick={onBack}
-              className="text-blue-400 font-medium hover:text-blue-300 transition-colors mt-1"
-            >
+            <p className="text-stone-400 text-sm">Pas encore de compte ?</p>
+            <button onClick={onBack} className="text-amber-400 font-medium hover:text-amber-300 transition-colors mt-1">
               Créer mon entreprise
             </button>
           </div>
@@ -220,11 +152,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="p-6 text-center">
-        <p className="text-slate-600 text-xs">
-          © 2026 E-Trans · v2.2.0
-        </p>
+      <div className="p-6 text-center relative z-10">
+        <p className="text-stone-500/60 text-xs">© 2026 E-Trans · v3.2</p>
       </div>
     </div>
   );

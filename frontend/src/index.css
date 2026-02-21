@@ -8,43 +8,43 @@
   }
 
   body {
-    @apply bg-slate-100 text-slate-900 antialiased;
+    @apply bg-stone-100 text-stone-900 antialiased;
   }
 
   .dark body {
-    @apply bg-slate-900 text-slate-100;
+    @apply bg-stone-900 text-stone-100;
   }
 
   .dark input, .dark select, .dark textarea {
-    @apply bg-slate-800 border-slate-600 text-slate-100;
+    @apply bg-stone-800 border-stone-600 text-stone-100;
   }
 
   .dark input::placeholder, .dark select::placeholder, .dark textarea::placeholder {
-    color: rgb(148 163 184); /* slate-400 */
+    color: rgb(168 162 158); /* stone-400 */
   }
 
   .dark .bg-white {
-    background-color: rgb(30 41 59); /* slate-800 */
+    background-color: rgb(41 37 36); /* stone-800 */
   }
 
   .dark .border-slate-200, .dark .border-slate-100 {
-    border-color: rgb(51 65 85); /* slate-600 */
+    border-color: rgb(87 83 78); /* stone-600 */
   }
 
   .dark .text-slate-900, .dark .text-slate-800, .dark .text-slate-700 {
-    color: rgb(226 232 240); /* slate-200 */
+    color: rgb(231 229 228); /* stone-200 */
   }
 
   .dark .text-slate-600, .dark .text-slate-500, .dark .text-slate-400 {
-    color: rgb(148 163 184); /* slate-400 */
+    color: rgb(168 162 158); /* stone-400 */
   }
 
   .dark .bg-slate-100, .dark .bg-slate-50 {
-    background-color: rgb(51 65 85); /* slate-600 */
+    background-color: rgb(87 83 78); /* stone-600 */
   }
 
   .dark .hover\:bg-slate-50:hover, .dark .hover\:bg-slate-100:hover {
-    background-color: rgb(71 85 105); /* slate-500 */
+    background-color: rgb(120 113 108); /* stone-500 */
   }
 
   ::-webkit-scrollbar {
@@ -57,11 +57,11 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-slate-300 rounded-full;
+    @apply bg-stone-300 rounded-full;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-slate-400;
+    @apply bg-stone-400;
   }
 
   input:-webkit-autofill {

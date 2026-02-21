@@ -37,3 +37,6 @@ coverage/
 .env*.local
 *.pdf
 *.png
+dossier1_ocr.txt
+pages_b64.txt
+.venv/
