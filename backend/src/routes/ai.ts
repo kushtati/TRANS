@@ -20,10 +20,29 @@ const aiLimiter = rateLimit({
 });
 router.use(aiLimiter);
 
-// Gemini client (gemini-2.5-flash : latest stable, rapide, multimodal)
-const GEMINI_MODEL = 'gemini-2.5-flash';
+// Gemini client — try multiple models for compatibility
+const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
 const genAI = env.GEMINI_API_KEY ? new GoogleGenerativeAI(env.GEMINI_API_KEY) : null;
-const model = genAI?.getGenerativeModel({ model: GEMINI_MODEL });
+let GEMINI_MODEL = GEMINI_MODELS[0];
+let model = genAI?.getGenerativeModel({ model: GEMINI_MODEL });
+
+// Test and select best available model on startup
+if (genAI) {
+  (async () => {
+    for (const m of GEMINI_MODELS) {
+      try {
+        const testModel = genAI.getGenerativeModel({ model: m });
+        await testModel.generateContent('test');
+        GEMINI_MODEL = m;
+        model = testModel;
+        log.info(`AI model selected: ${m}`);
+        break;
+      } catch (e: any) {
+        log.warn(`AI model ${m} unavailable: ${e.message?.substring(0, 80)}`);
+      }
+    }
+  })();
+}
 
 // Schemas
 const chatSchema = z.object({
