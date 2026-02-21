@@ -13,11 +13,11 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onRegiste
     <div className="min-h-[100dvh] relative flex flex-col overflow-hidden">
 
       {/* Background — cinematic port image */}
-      <div className="absolute inset-0">
+      <div className="absolute inset-0 bg-stone-950">
         <img
           src="/hero-bg.webp"
           alt=""
-          className="w-full h-full object-cover animate-fade-in"
+          className="w-full h-full object-cover object-[center_40%] md:object-[center_50%] animate-fade-in"
         />
         {/* Deep warm overlay for contrast & readability */}
         <div className="absolute inset-0 bg-gradient-to-b from-amber-950/50 via-stone-900/30 to-stone-950/90" />
