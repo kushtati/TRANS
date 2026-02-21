@@ -91,14 +91,55 @@ export const CreateShipmentForm: React.FC<CreateShipmentFormProps> = ({ onSucces
     const filled = new Set<string>();
     setFormData(prev => {
       const u = { ...prev };
-      const sm: Record<string, keyof FormData> = { blNumber:'blNumber', clientName:'clientName', clientAddress:'clientAddress', description:'description', hsCode:'hsCode', packaging:'packaging', vesselName:'vesselName', voyageNumber:'voyageNumber', portOfLoading:'portOfLoading', portOfDischarge:'portOfDischarge', supplierName:'supplierName', supplierCountry:'supplierCountry', cifCurrency:'cifCurrency' };
+      // Map all string fields from extraction to form fields
+      const sm: Record<string, keyof FormData> = {
+        blNumber:'blNumber', clientName:'clientName', clientNif:'clientNif', clientPhone:'clientPhone',
+        clientAddress:'clientAddress', description:'description', hsCode:'hsCode', packaging:'packaging',
+        vesselName:'vesselName', voyageNumber:'voyageNumber', portOfLoading:'portOfLoading',
+        supplierName:'supplierName', supplierCountry:'supplierCountry', cifCurrency:'cifCurrency',
+        ddiNumber:'ddiNumber'
+      };
       for (const [k, fk] of Object.entries(sm)) { const v = data[k]; if (v && typeof v === 'string' && v.trim()) { (u as any)[fk] = v.trim(); filled.add(fk); } }
-      if (data.packageCount > 0) { u.packageCount = String(data.packageCount); filled.add('packageCount'); }
-      if (data.grossWeight > 0) { u.grossWeight = String(data.grossWeight); filled.add('grossWeight'); }
-      if (data.cifValue > 0) { u.cifValue = String(data.cifValue); filled.add('cifValue'); }
+      // Port of discharge: only apply if valid value
+      if (data.portOfDischarge && typeof data.portOfDischarge === 'string') {
+        const pd = data.portOfDischarge.toUpperCase().trim();
+        if (pd.includes('CONAKRY')) { u.portOfDischarge = 'CONAKRY'; filled.add('portOfDischarge'); }
+        else if (pd.includes('KAMSAR')) { u.portOfDischarge = 'KAMSAR'; filled.add('portOfDischarge'); }
+      }
+      // ETA date
+      if (data.eta && typeof data.eta === 'string' && data.eta.match(/^\d{4}-\d{2}-\d{2}/)) {
+        u.eta = data.eta.substring(0, 10); filled.add('eta');
+      }
+      // Customs regime
+      if (data.customsRegime && ['IM4','IM5','IM7','TR'].includes(data.customsRegime)) {
+        u.customsRegime = data.customsRegime as any; filled.add('customsRegime');
+      }
+      // Numeric fields
+      if (data.packageCount > 0) { u.packageCount = String(Math.round(data.packageCount)); filled.add('packageCount'); }
+      if (data.grossWeight > 0) { u.grossWeight = String(Math.round(data.grossWeight * 100) / 100); filled.add('grossWeight'); }
+      if (data.cifValue > 0) { u.cifValue = String(Math.round(data.cifValue * 100) / 100); filled.add('cifValue'); }
+      // Containers
       if (data.containers?.length > 0) {
-        u.containers = data.containers.map((c: any) => ({ id: crypto.randomUUID(), number: c.number||'', type: (c.type||'DRY_40HC') as ContainerType, sealNumber: c.sealNumber||'', grossWeight: c.grossWeight ? String(c.grossWeight) : '', packageCount: c.packageCount ? String(c.packageCount) : '', temperature: '' }));
+        u.containers = data.containers.map((c: any) => ({
+          id: crypto.randomUUID(),
+          number: c.number || '',
+          type: (['DRY_20','DRY_40','DRY_40HC','REEFER_20','REEFER_40','REEFER_40HR'].includes(c.type) ? c.type : 'DRY_40HC') as ContainerType,
+          sealNumber: c.sealNumber || '',
+          grossWeight: c.grossWeight ? String(Math.round(c.grossWeight * 100) / 100) : '',
+          packageCount: c.packageCount ? String(Math.round(c.packageCount)) : '',
+          temperature: ''
+        }));
         filled.add('containers');
+      }
+      // If total grossWeight not set but containers have weights, calculate total
+      if (!filled.has('grossWeight') && filled.has('containers')) {
+        const totalW = u.containers.reduce((s, c) => s + (parseFloat(c.grossWeight) || 0), 0);
+        if (totalW > 0) { u.grossWeight = String(Math.round(totalW * 100) / 100); filled.add('grossWeight'); }
+      }
+      // If total packageCount not set but containers have counts, calculate total
+      if (!filled.has('packageCount') && filled.has('containers')) {
+        const totalP = u.containers.reduce((s, c) => s + (parseInt(c.packageCount) || 0), 0);
+        if (totalP > 0) { u.packageCount = String(totalP); filled.add('packageCount'); }
       }
       return u;
     });

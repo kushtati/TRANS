@@ -208,55 +208,64 @@ import path from 'path';
 
 const blUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB max — évite OOM sur Railway
+  limits: { fileSize: 15 * 1024 * 1024 }, // 15 MB max
   fileFilter: (_req, file, cb) => {
     const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
     cb(null, allowed.includes(file.mimetype));
   },
 });
 
-const BL_EXTRACTION_PROMPT = `Tu es un expert en transit maritime. Analyse ce document (Bill of Lading / Connaissement) et extrais les informations suivantes au format JSON strict.
+const BL_EXTRACTION_PROMPT = `Tu es un expert en transit maritime et dédouanement en Guinée Conakry. Analyse ce document (Bill of Lading / Connaissement / BL) et extrais TOUTES les informations possibles.
 
-IMPORTANT: Retourne UNIQUEMENT un objet JSON valide, sans texte avant ou après. Si un champ n'est pas trouvé, utilise une chaîne vide "" pour les textes et 0 pour les nombres.
+RETOURNE UNIQUEMENT un objet JSON valide, sans markdown, sans texte avant ou après.
 
+STRUCTURE JSON ATTENDUE (remplis TOUS les champs — si introuvable, utilise "" pour texte et 0 pour nombres) :
 {
-  "blNumber": "numéro du BL (ex: MEDU09243710)",
-  "clientName": "nom du destinataire/consignee",
-  "clientAddress": "adresse du destinataire",
-  "description": "description de la marchandise",
-  "hsCode": "code SH/HS (ex: 1006.30)",
-  "packaging": "type d'emballage (Sac, Carton, Palette...)",
+  "blNumber": "numéro complet du BL/connaissement (ex: MEDU09243710, MAEU123456789)",
+  "clientName": "nom complet du CONSIGNEE/DESTINATAIRE (pas le shipper)",
+  "clientNif": "NIF ou numéro fiscal du destinataire si visible",
+  "clientPhone": "téléphone du destinataire si visible",
+  "clientAddress": "adresse complète du destinataire",
+  "description": "description COMPLÈTE de la marchandise avec détails (ex: RIZ BRISE 5% EN SACS DE 25KG)",
+  "hsCode": "code SH/HS (ex: 1006.30, 8703.23) — cherche dans les champs HS Code, Commodity Code, Tariff",
+  "packaging": "type d'emballage : Sac, Carton, Palette, Fût, Vrac, Conteneur, Caisse, Ballot, Rouleau",
   "packageCount": 0,
   "grossWeight": 0,
   "netWeight": 0,
   "cifValue": 0,
   "cifCurrency": "USD",
-  "vesselName": "nom du navire",
-  "voyageNumber": "numéro de voyage",
-  "portOfLoading": "port de chargement",
-  "portOfDischarge": "port de déchargement",
-  "supplierName": "nom de l'expéditeur/shipper",
-  "supplierCountry": "pays de l'expéditeur",
+  "vesselName": "nom complet du navire/vessel (ex: MSC BANU III, MAERSK SELETAR)",
+  "voyageNumber": "numéro de voyage (ex: XA545A, 234W)",
+  "portOfLoading": "port de chargement en MAJUSCULES (ex: ANTWERP, SHANGHAI, ISTANBUL)",
+  "portOfDischarge": "port de déchargement — utilise CONAKRY si Conakry/Guinée détecté, sinon KAMSAR",
+  "eta": "date d'arrivée estimée au format YYYY-MM-DD si visible (ETA, Arrival Date)",
+  "supplierName": "nom complet du SHIPPER/EXPÉDITEUR (première partie du BL)",
+  "supplierCountry": "pays du shipper en MAJUSCULES (ex: NETHERLANDS, CHINA, TURKEY, INDIA)",
+  "customsRegime": "IM4 par défaut (mise à consommation). IM5 si temporaire, IM7 si entrepôt, TR si transit",
   "containers": [
     {
-      "number": "numéro conteneur ISO (4 lettres + 7 chiffres)",
+      "number": "numéro conteneur ISO complet (4 lettres + 7 chiffres, ex: SEGU9759487)",
       "type": "DRY_20 | DRY_40 | DRY_40HC | REEFER_20 | REEFER_40 | REEFER_40HR",
-      "sealNumber": "numéro de scellé/plomb",
+      "sealNumber": "numéro de scellé/plomb/seal",
       "grossWeight": 0,
       "packageCount": 0
     }
   ]
 }
 
-Règles pour le type de conteneur:
-- 20 pieds standard → DRY_20
-- 40 pieds standard → DRY_40
-- 40 pieds High Cube (HC/HQ) → DRY_40HC
-- 20 pieds réfrigéré → REEFER_20
-- 40 pieds réfrigéré → REEFER_40
-- Si non spécifié, utilise DRY_40HC par défaut
+RÈGLES CRITIQUES :
+1. CONSIGNEE = client/destinataire. SHIPPER = fournisseur/expéditeur. Ne les confonds JAMAIS.
+2. grossWeight et packageCount au niveau racine = TOTAUX de tout le BL.
+3. grossWeight et packageCount dans chaque conteneur = valeurs PAR conteneur.
+4. Si le poids est en tonnes (MT/T), multiplie par 1000 pour convertir en kg.
+5. Cherche la valeur CIF/FOB dans les champs "Declared Value", "Freight", "Total Value".
+6. Type conteneur : 20' → DRY_20, 40' → DRY_40, 40'HC/HQ → DRY_40HC, RF/Reefer 20' → REEFER_20, RF/Reefer 40' → REEFER_40. Si non précisé → DRY_40HC.
+7. Pour le pays du shipper : déduis-le de l'adresse du shipper ou du port de chargement.
+8. Si packaging non explicite : déduis du contexte (riz/ciment → Sac, pièces auto → Carton, liquides → Fût).
+9. Extrais CHAQUE conteneur listé, même s'il y en a beaucoup.
+10. Le code HS peut apparaître sous : HS Code, Commodity Code, Harmonized System, Tariff Number.
 
-Extrais le maximum d'informations du document.`;
+Extrais le MAXIMUM d'informations. Mieux vaut deviner intelligemment que laisser vide.`;
 
 router.post('/extract-bl', blUpload.single('file'), async (req: Request, res: Response) => {
   try {
