@@ -10,79 +10,88 @@ interface WelcomeScreenProps {
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onRegister }) => {
   return (
-    <div className="min-h-screen relative flex flex-col overflow-hidden">
+    <div className="min-h-[100dvh] relative flex flex-col overflow-hidden">
 
-      {/* Background — golden hour port atmosphere */}
+      {/* Background — cinematic port image */}
       <div className="absolute inset-0">
         <img
           src="/hero-bg.png"
           alt=""
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover animate-fade-in"
         />
-        {/* Warm overlay — golden/amber tones matching the image */}
-        <div className="absolute inset-0 bg-gradient-to-b from-amber-950/60 via-stone-900/40 to-stone-950/85" />
-        {/* Subtle warm radial glow */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(251,191,36,0.08)_0%,_transparent_60%)]" />
+        {/* Deep warm overlay for contrast & readability */}
+        <div className="absolute inset-0 bg-gradient-to-b from-amber-950/50 via-stone-900/30 to-stone-950/90" />
+        {/* Ambient glow at top */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(251,191,36,0.06)_0%,_transparent_50%)]" />
       </div>
 
-      {/* Content */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 pt-12 pb-6 relative z-10">
+      {/* Safe area spacer for iPhone notch */}
+      <div className="pt-[env(safe-area-inset-top)]" />
 
-        {/* Logo */}
-        <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-40 h-40 mb-7">
-            <img src="/logo.png" alt="E-Trans" className="w-full h-full object-contain" />
+      {/* Content — vertically centered */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-8 relative z-10">
+
+        {/* Logo — floating animation */}
+        <div className="text-center mb-8 animate-fade-up">
+          <div className="inline-flex items-center justify-center w-36 h-36 sm:w-44 sm:h-44 mb-6 animate-float">
+            <img 
+              src="/logo.png" 
+              alt="E-Trans" 
+              className="w-full h-full object-contain drop-shadow-[0_8px_32px_rgba(245,158,11,0.15)]" 
+            />
           </div>
 
-          <p className="text-amber-100 text-sm sm:text-base font-light tracking-[0.15em] uppercase">
+          <p className="text-amber-100/90 text-[13px] sm:text-base font-light tracking-[0.2em] uppercase animate-fade-up stagger-1">
             Transit & Dédouanement
           </p>
-          <p className="text-stone-300 text-xs mt-1.5 tracking-wider">
+          <p className="text-stone-400 text-[11px] sm:text-xs mt-1 tracking-wider animate-fade-up stagger-2">
             Conakry — République de Guinée
           </p>
         </div>
 
-        {/* Feature pills */}
-        <div className="flex flex-wrap items-center justify-center gap-2.5 mb-10">
-          <div className="flex items-center gap-2 px-3.5 py-2 bg-white/[0.12] backdrop-blur-sm rounded-full border border-white/[0.15]">
-            <Ship size={13} className="text-amber-400" />
-            <span className="text-[11px] text-white font-medium tracking-wide">Suivi temps réel</span>
-          </div>
-          <div className="flex items-center gap-2 px-3.5 py-2 bg-white/[0.12] backdrop-blur-sm rounded-full border border-white/[0.15]">
-            <FileCheck size={13} className="text-amber-400" />
-            <span className="text-[11px] text-white font-medium tracking-wide">Extraction IA</span>
-          </div>
-          <div className="flex items-center gap-2 px-3.5 py-2 bg-white/[0.12] backdrop-blur-sm rounded-full border border-white/[0.15]">
-            <Shield size={13} className="text-amber-400" />
-            <span className="text-[11px] text-white font-medium tracking-wide">100% sécurisé</span>
-          </div>
+        {/* Feature pills — staggered */}
+        <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 mb-10">
+          {[
+            { icon: Ship, label: 'Suivi temps réel' },
+            { icon: FileCheck, label: 'Extraction IA' },
+            { icon: Shield, label: '100% sécurisé' },
+          ].map((feat, i) => (
+            <div key={feat.label}
+              className={`flex items-center gap-2 px-4 py-2.5 glass rounded-full animate-fade-up stagger-${i + 3}`}>
+              <feat.icon size={14} className="text-amber-400" />
+              <span className="text-[11px] sm:text-xs text-white/90 font-medium tracking-wide">{feat.label}</span>
+            </div>
+          ))}
         </div>
 
-        {/* Action Buttons */}
-        <div className="w-full max-w-[340px] space-y-3">
+        {/* CTA Buttons — premium mobile touch targets */}
+        <div className="w-full max-w-[360px] space-y-3 animate-fade-up stagger-6">
+          
+          {/* Primary CTA */}
           <button
             onClick={onRegister}
-            className="group w-full flex items-center justify-center gap-3 py-[15px] px-6 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-bold rounded-2xl shadow-xl shadow-amber-600/20 transition-all duration-200 active:scale-[0.97]"
+            className="group w-full flex items-center justify-center gap-3 py-4 px-6 bg-gradient-to-r from-amber-500 to-amber-600 text-stone-950 font-bold rounded-2xl shadow-[0_8px_32px_-4px_rgba(245,158,11,0.35)] transition-all duration-200 active:scale-[0.97] active:shadow-[0_4px_16px_-4px_rgba(245,158,11,0.4)] animate-glow-pulse"
           >
-            <UserPlus size={17} strokeWidth={2.5} />
+            <UserPlus size={18} strokeWidth={2.5} />
             <span className="text-[15px]">Créer mon entreprise</span>
-            <ArrowRight size={15} className="ml-auto opacity-50 group-hover:opacity-80 group-hover:translate-x-0.5 transition-all" />
+            <ArrowRight size={16} className="ml-auto opacity-40 group-active:translate-x-1 transition-transform" />
           </button>
 
+          {/* Secondary CTA */}
           <button
             onClick={onLogin}
-            className="w-full flex items-center justify-center gap-3 py-[15px] px-6 bg-white/[0.12] backdrop-blur-md text-white font-semibold rounded-2xl border border-amber-400/30 hover:bg-white/[0.18] hover:border-amber-400/40 transition-all duration-200 active:scale-[0.97]"
+            className="w-full flex items-center justify-center gap-3 py-4 px-6 glass-strong text-white font-semibold rounded-2xl transition-all duration-200 active:scale-[0.97] active:bg-white/20"
           >
-            <LogIn size={17} />
+            <LogIn size={18} />
             <span className="text-[15px]">Se connecter</span>
           </button>
         </div>
 
       </div>
 
-      {/* Footer */}
-      <div className="py-5 px-6 text-center relative z-10">
-        <p className="text-stone-300/70 text-[11px] tracking-widest uppercase">
+      {/* Footer — safe area aware */}
+      <div className="py-4 px-6 pb-[max(1rem,env(safe-area-inset-bottom))] text-center relative z-10 animate-fade-in stagger-6">
+        <p className="text-stone-500/50 text-[10px] tracking-[0.2em] uppercase">
           © 2026 E-Trans · Conakry, Guinée
         </p>
       </div>

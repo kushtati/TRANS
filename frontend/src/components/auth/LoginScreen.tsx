@@ -31,7 +31,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     e.preventDefault();
     if (!email.trim()) { setError('Email requis'); return; }
     if (!password) { setError('Mot de passe requis'); return; }
-
     setIsLoading(true);
     setError('');
 
@@ -57,94 +56,103 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   };
 
   return (
-    <div className="min-h-screen relative flex flex-col overflow-hidden">
+    <div className="min-h-[100dvh] relative flex flex-col overflow-hidden">
 
       {/* Background */}
       <div className="absolute inset-0">
         <img src="/hero-bg.png" alt="" className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-b from-stone-900/70 via-stone-900/60 to-stone-950/90" />
+        <div className="absolute inset-0 bg-gradient-to-b from-stone-900/75 via-stone-900/65 to-stone-950/92" />
       </div>
 
-      {/* Header */}
-      <div className="p-4 flex items-center gap-3 relative z-10">
+      {/* Header — safe area */}
+      <div className="pt-[env(safe-area-inset-top)]" />
+      <div className="p-4 flex items-center gap-3 relative z-10 animate-fade-up">
         <button onClick={onBack}
-          className="p-2 rounded-full bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white transition-colors">
+          className="p-2.5 rounded-full glass tap-highlight active:scale-95 transition-all text-white">
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-white font-semibold">Connexion</h1>
+        <h1 className="text-white/90 font-semibold text-[17px]">Connexion</h1>
       </div>
 
       {/* Content */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6 relative z-10">
+      <div className="flex-1 flex flex-col items-center justify-center px-5 pb-6 relative z-10 scroll-smooth-ios">
         <div className="w-full max-w-sm">
           
           {/* Logo */}
-          <div className="text-center mb-8">
-            <div className="w-20 h-20 mx-auto mb-4">
-              <img src="/logo.png" alt="E-Trans" className="w-full h-full object-contain" />
+          <div className="text-center mb-8 animate-fade-up stagger-1">
+            <div className="w-20 h-20 mx-auto mb-4 animate-float">
+              <img src="/logo.png" alt="E-Trans" className="w-full h-full object-contain drop-shadow-[0_4px_20px_rgba(245,158,11,0.12)]" />
             </div>
-            <h2 className="text-2xl font-bold text-white">Bienvenue</h2>
-            <p className="text-stone-300 text-sm mt-1">Connectez-vous à votre compte</p>
+            <h2 className="text-[26px] font-bold text-white tracking-tight">Bienvenue</h2>
+            <p className="text-stone-400 text-[13px] mt-1">Connectez-vous à votre compte</p>
           </div>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             
             {error && (
-              <div className="p-3 bg-red-500/15 border border-red-500/30 rounded-xl flex items-center gap-2 text-red-300 text-sm backdrop-blur-sm">
-                <AlertCircle size={18} className="flex-shrink-0" />
+              <div className="p-3.5 glass border-red-500/20 !bg-red-500/10 rounded-2xl flex items-center gap-2.5 text-red-300 text-[13px] animate-scale-in">
+                <AlertCircle size={18} className="flex-shrink-0 text-red-400" />
                 {error}
               </div>
             )}
 
-            <div>
-              <label className="block text-xs font-semibold text-amber-200/80 uppercase mb-1.5">Email</label>
+            {/* Email */}
+            <div className="animate-fade-up stagger-2">
+              <label className="block text-[11px] font-semibold text-amber-200/70 uppercase tracking-wider mb-2">Email</label>
               <div className="relative">
-                <Mail className="absolute left-3 top-3.5 text-stone-400" size={18} />
+                <Mail className="absolute left-4 top-[15px] text-stone-500" size={18} />
                 <input type="email" value={email}
                   onChange={e => { setEmail(e.target.value); setError(''); }}
-                  className="w-full bg-white/10 backdrop-blur-sm border border-white/20 text-white rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/30 transition-all placeholder:text-stone-500"
+                  className="w-full glass-strong text-white rounded-2xl pl-11 pr-4 py-[14px] text-[15px] focus:outline-none focus:ring-2 focus:ring-amber-500/40 transition-all placeholder:text-stone-600"
                   placeholder="votre@email.com" autoComplete="email" autoFocus />
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-amber-200/80 uppercase mb-1.5">Mot de passe</label>
+            {/* Password */}
+            <div className="animate-fade-up stagger-3">
+              <label className="block text-[11px] font-semibold text-amber-200/70 uppercase tracking-wider mb-2">Mot de passe</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-3.5 text-stone-400" size={18} />
+                <Lock className="absolute left-4 top-[15px] text-stone-500" size={18} />
                 <input type={showPassword ? 'text' : 'password'} value={password}
                   onChange={e => { setPassword(e.target.value); setError(''); }}
-                  className="w-full bg-white/10 backdrop-blur-sm border border-white/20 text-white rounded-xl pl-10 pr-12 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/30 transition-all placeholder:text-stone-500"
+                  className="w-full glass-strong text-white rounded-2xl pl-11 pr-12 py-[14px] text-[15px] focus:outline-none focus:ring-2 focus:ring-amber-500/40 transition-all placeholder:text-stone-600"
                   placeholder="••••••••" autoComplete="current-password" />
                 <button type="button" onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3.5 text-stone-400 hover:text-white transition-colors">
+                  className="absolute right-4 top-[14px] text-stone-500 hover:text-white active:scale-90 transition-all p-0.5">
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
             </div>
 
-            <div className="text-right">
+            {/* Forgot Password */}
+            <div className="text-right animate-fade-up stagger-3">
               <button type="button" onClick={() => onForgotPassword?.()}
-                className="text-sm text-stone-400 hover:text-amber-400 transition-colors">
+                className="text-[13px] text-stone-500 hover:text-amber-400 active:text-amber-300 transition-colors py-1">
                 Mot de passe oublié ?
               </button>
             </div>
 
-            <button type="submit" disabled={isLoading}
-              className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-bold rounded-xl transition-all disabled:opacity-60 flex items-center justify-center gap-2 shadow-lg shadow-amber-600/20 active:scale-[0.97]">
-              {isLoading ? (<><Loader2 size={20} className="animate-spin" /> Connexion...</>) : 'Se connecter'}
-            </button>
+            {/* Submit */}
+            <div className="animate-fade-up stagger-4 pt-1">
+              <button type="submit" disabled={isLoading}
+                className="w-full py-4 bg-gradient-to-r from-amber-500 to-amber-600 text-stone-950 font-bold rounded-2xl transition-all disabled:opacity-60 flex items-center justify-center gap-2.5 shadow-[0_8px_32px_-4px_rgba(245,158,11,0.3)] active:scale-[0.97] active:shadow-[0_4px_16px_-4px_rgba(245,158,11,0.4)] text-[15px]">
+                {isLoading ? (<><Loader2 size={20} className="animate-spin" /> Connexion...</>) : 'Se connecter'}
+              </button>
+            </div>
           </form>
 
-          <div className="flex items-center gap-4 my-6">
-            <div className="flex-1 h-px bg-white/10" />
-            <span className="text-stone-500 text-xs">OU</span>
-            <div className="flex-1 h-px bg-white/10" />
+          {/* Divider */}
+          <div className="flex items-center gap-4 my-7 animate-fade-up stagger-5">
+            <div className="flex-1 h-px bg-white/[0.08]" />
+            <span className="text-stone-600 text-[11px] uppercase tracking-wider">ou</span>
+            <div className="flex-1 h-px bg-white/[0.08]" />
           </div>
 
-          <div className="text-center">
-            <p className="text-stone-400 text-sm">Pas encore de compte ?</p>
-            <button onClick={onBack} className="text-amber-400 font-medium hover:text-amber-300 transition-colors mt-1">
+          {/* Register */}
+          <div className="text-center animate-fade-up stagger-5">
+            <p className="text-stone-500 text-[13px]">Pas encore de compte ?</p>
+            <button onClick={onBack} className="text-amber-400 font-semibold hover:text-amber-300 active:text-amber-200 transition-colors mt-1.5 text-[15px]">
               Créer mon entreprise
             </button>
           </div>
@@ -152,8 +160,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         </div>
       </div>
 
-      <div className="p-6 text-center relative z-10">
-        <p className="text-stone-500/60 text-xs">© 2026 E-Trans · v3.2</p>
+      {/* Footer */}
+      <div className="py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-center relative z-10">
+        <p className="text-stone-600/50 text-[10px] tracking-[0.15em]">© 2026 E-Trans · v4.0</p>
       </div>
     </div>
   );

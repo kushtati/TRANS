@@ -92,7 +92,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
 
   return (
     <div className="min-h-screen bg-stone-100 flex flex-col">
-      <header className={`${headerBg} text-white sticky top-0 z-50 shadow-lg`}>
+      <header className={`${headerBg} text-white sticky top-0 z-50 shadow-[0_2px_16px_-2px_rgba(0,0,0,0.3)]`}>
         <div className="px-4 py-3">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-2 cursor-pointer" onClick={() => onNavigate('dashboard')}>
@@ -178,9 +178,9 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
 
           <form onSubmit={handleSearchSubmit} className="mt-3 md:hidden">
             <div className="relative">
-              <Search className="absolute left-3 top-2.5 text-slate-400" size={18} />
+              <Search className="absolute left-3.5 top-2.5 text-stone-500" size={18} />
               <input type="text" value={searchQuery} onChange={(e) => handleSearch(e.target.value)}
-                placeholder="Rechercher..." className="w-full bg-white/10 border border-white/15 text-white rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50" />
+                placeholder="Rechercher un dossier..." className="w-full bg-white/[0.08] border border-white/10 text-white rounded-xl pl-10 pr-4 py-2.5 text-[14px] focus:outline-none focus:ring-2 focus:ring-amber-500/40 placeholder:text-stone-600 transition-all" />
             </div>
           </form>
         </div>
@@ -201,24 +201,34 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
         )}
       </header>
 
-      <main className="flex-1 pb-20 md:pb-6">{children}</main>
+      <main className="flex-1 pb-24 md:pb-6">{children}</main>
 
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-stone-200 md:hidden z-40 pb-[env(safe-area-inset-bottom)]">
-        <div className="flex justify-around items-center px-2 py-2">
-          {visibleNavItems.slice(0, 5).map(item => (
-            <button key={item.id} onClick={() => onNavigate(item.id)}
-              className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg transition-colors min-w-[52px] relative ${
-                currentView === item.id ? 'text-amber-600' : 'text-stone-500 hover:text-stone-700'
-              }`}>
-              <item.icon size={20} strokeWidth={currentView === item.id ? 2.5 : 2} />
-              <span className="text-[10px] font-medium">{item.label}</span>
-              {item.id === 'team' && unreadNotifs > 0 && (
-                <span className="absolute -top-0.5 right-0 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
-                  {unreadNotifs > 9 ? '9+' : unreadNotifs}
-                </span>
-              )}
-            </button>
-          ))}
+      <nav className="fixed bottom-0 left-0 right-0 md:hidden z-40">
+        {/* Glassmorphic bottom bar */}
+        <div className="mx-3 mb-[max(0.5rem,env(safe-area-inset-bottom))] bg-white/95 backdrop-blur-2xl border border-stone-200/80 rounded-2xl shadow-[0_-4px_24px_-4px_rgba(0,0,0,0.08)]">
+          <div className="flex justify-around items-center px-1 py-1.5">
+            {visibleNavItems.slice(0, 5).map(item => (
+              <button key={item.id} onClick={() => onNavigate(item.id)}
+                className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl transition-all duration-200 min-w-[52px] relative tap-highlight ${
+                  currentView === item.id 
+                    ? 'text-amber-600 bg-amber-50' 
+                    : 'text-stone-400 active:bg-stone-100 active:text-stone-600'
+                }`}>
+                <item.icon size={21} strokeWidth={currentView === item.id ? 2.5 : 1.8} />
+                <span className={`text-[10px] font-semibold ${
+                  currentView === item.id ? 'text-amber-600' : 'text-stone-400'
+                }`}>{item.label}</span>
+                {currentView === item.id && (
+                  <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-5 h-[3px] bg-amber-500 rounded-full" />
+                )}
+                {item.id === 'team' && unreadNotifs > 0 && (
+                  <span className="absolute top-0.5 right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center shadow-sm">
+                    {unreadNotifs > 9 ? '9+' : unreadNotifs}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
         </div>
       </nav>
     </div>

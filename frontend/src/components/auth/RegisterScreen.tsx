@@ -102,7 +102,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onSuccess, onLog
   const passwordStrength = getPasswordStrength(formData.password);
 
   return (
-    <div className="min-h-screen relative flex flex-col overflow-hidden">
+    <div className="min-h-[100dvh] relative flex flex-col overflow-hidden">
 
       {/* Background */}
       <div className="absolute inset-0">
@@ -111,9 +111,9 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onSuccess, onLog
       </div>
 
       {/* Header */}
-      <div className="p-4 flex items-center gap-3 relative z-10">
+      <div className="p-4 pt-[max(1rem,env(safe-area-inset-top))] flex items-center gap-3 relative z-10 animate-fade-up">
         <button onClick={step === 1 ? onLogin : () => setStep(1)}
-          className="p-2 rounded-full bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white transition-colors">
+          className="p-2.5 rounded-full glass hover:bg-white/20 text-white transition-all active:scale-[0.95] tap-highlight">
           <ArrowLeft size={20} />
         </button>
         <div>
@@ -123,7 +123,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onSuccess, onLog
       </div>
 
       {/* Progress Bar */}
-      <div className="px-4 mb-6 relative z-10">
+      <div className="px-4 mb-6 relative z-10 animate-fade-up stagger-1">
         <div className="h-1 bg-white/10 rounded-full overflow-hidden">
           <div className="h-full bg-gradient-to-r from-amber-500 to-amber-400 transition-all duration-500"
             style={{ width: step === 1 ? '50%' : '100%' }} />
@@ -131,7 +131,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onSuccess, onLog
       </div>
 
       {/* Form */}
-      <div className="flex-1 px-4 pb-8 overflow-y-auto relative z-10">
+      <div className="flex-1 px-4 pb-[max(2rem,env(safe-area-inset-bottom))] overflow-y-auto relative z-10 scroll-smooth-ios">
         <form onSubmit={handleSubmit} className="max-w-md mx-auto space-y-5">
           
           {error && (
@@ -142,31 +142,33 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onSuccess, onLog
           )}
 
           {step === 1 ? (
-            <div className="space-y-5 animate-fade-in">
-              <div className="text-center mb-8">
-                <div className="w-16 h-16 bg-amber-500/15 backdrop-blur-sm rounded-2xl flex items-center justify-center mx-auto mb-4 border border-amber-500/20">
+            <div className="space-y-5">
+              <div className="text-center mb-8 animate-fade-up stagger-2">
+                <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center mx-auto mb-4">
                   <Building2 size={32} className="text-amber-400" />
                 </div>
                 <h2 className="text-xl font-bold text-white">Votre entreprise</h2>
                 <p className="text-stone-300 text-sm mt-1">Informations de votre société de transit</p>
               </div>
 
-              <InputField
-                label="Nom de l'entreprise" icon={<Building2 size={18} />}
-                type="text" value={formData.companyName}
-                onChange={handleChange('companyName')}
-                placeholder="Ex: Transit Express Guinée"
-                error={fieldErrors.companyName} required />
+              <div className="animate-fade-up stagger-3">
+                <InputField
+                  label="Nom de l'entreprise" icon={<Building2 size={18} />}
+                  type="text" value={formData.companyName}
+                  onChange={handleChange('companyName')}
+                  placeholder="Ex: Transit Express Guinée"
+                  error={fieldErrors.companyName} required />
+              </div>
 
               <button type="button" onClick={handleNextStep}
-                className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-bold rounded-xl transition-all shadow-lg shadow-amber-600/20 active:scale-[0.97]">
+                className="w-full py-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-bold rounded-2xl transition-all shadow-lg shadow-amber-600/20 active:scale-[0.97] tap-highlight animate-fade-up stagger-4">
                 Continuer
               </button>
             </div>
           ) : (
-            <div className="space-y-4 animate-fade-in">
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-emerald-500/15 backdrop-blur-sm rounded-2xl flex items-center justify-center mx-auto mb-4 border border-emerald-500/20">
+            <div className="space-y-4">
+              <div className="text-center mb-6 animate-fade-up stagger-1">
+                <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center mx-auto mb-4">
                   <User size={32} className="text-emerald-400" />
                 </div>
                 <h2 className="text-xl font-bold text-white">Compte administrateur</h2>
@@ -175,20 +177,26 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onSuccess, onLog
                 </p>
               </div>
 
+              <div className="animate-fade-up stagger-2">
               <InputField label="Nom complet" icon={<User size={18} />} type="text"
                 value={formData.name} onChange={handleChange('name')}
                 placeholder="Mamadou Diallo" error={fieldErrors.name} required />
+              </div>
 
+              <div className="animate-fade-up stagger-3">
               <InputField label="Email" hint="Gmail ou iCloud recommandé" icon={<Mail size={18} />}
                 type="email" value={formData.email} onChange={handleChange('email')}
                 placeholder="votre@email.com" error={fieldErrors.email} required />
+              </div>
 
+              <div className="animate-fade-up stagger-4">
               <InputField label="Téléphone" hint="Optionnel" icon={<Phone size={18} />}
                 type="tel" value={formData.phone} onChange={handleChange('phone')}
                 placeholder="+224 XXX XXX XXX" />
+              </div>
 
               {/* Password */}
-              <div>
+              <div className="animate-fade-up stagger-5">
                 <label className="block text-xs font-semibold text-amber-200/80 uppercase mb-1.5">
                   Mot de passe <span className="text-red-400">*</span>
                 </label>
@@ -196,10 +204,10 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onSuccess, onLog
                   <Lock className="absolute left-3 top-3.5 text-stone-400" size={18} />
                   <input type={showPassword ? 'text' : 'password'} value={formData.password}
                     onChange={handleChange('password')}
-                    className={`w-full bg-white/10 backdrop-blur-sm border ${fieldErrors.password ? 'border-red-500/50' : 'border-white/20'} text-white rounded-xl pl-10 pr-12 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-all placeholder:text-stone-500`}
+                    className={`w-full glass-strong text-white rounded-2xl pl-10 pr-12 py-[14px] focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-all placeholder:text-stone-500 ${fieldErrors.password ? 'ring-1 ring-red-500/50' : ''}`}
                     placeholder="Min. 8 caractères" />
                   <button type="button" onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-3.5 text-stone-400 hover:text-white">
+                    className="absolute right-3 top-3.5 text-stone-400 hover:text-white p-1">
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
@@ -218,7 +226,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onSuccess, onLog
               </div>
 
               {/* Confirm Password */}
-              <div>
+              <div className="animate-fade-up stagger-6">
                 <label className="block text-xs font-semibold text-amber-200/80 uppercase mb-1.5">
                   Confirmer le mot de passe <span className="text-red-400">*</span>
                 </label>
@@ -226,7 +234,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onSuccess, onLog
                   <Lock className="absolute left-3 top-3.5 text-stone-400" size={18} />
                   <input type={showPassword ? 'text' : 'password'} value={formData.confirmPassword}
                     onChange={handleChange('confirmPassword')}
-                    className={`w-full bg-white/10 backdrop-blur-sm border ${fieldErrors.confirmPassword ? 'border-red-500/50' : 'border-white/20'} text-white rounded-xl pl-10 pr-12 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-all placeholder:text-stone-500`}
+                    className={`w-full glass-strong text-white rounded-2xl pl-10 pr-12 py-[14px] focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-all placeholder:text-stone-500 ${fieldErrors.confirmPassword ? 'ring-1 ring-red-500/50' : ''}`}
                     placeholder="Répétez le mot de passe" />
                   {formData.confirmPassword && formData.password === formData.confirmPassword && (
                     <CheckCircle2 className="absolute right-3 top-3.5 text-green-500" size={18} />
@@ -236,11 +244,11 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onSuccess, onLog
               </div>
 
               <button type="submit" disabled={isLoading}
-                className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-bold rounded-xl transition-all disabled:opacity-60 flex items-center justify-center gap-2 mt-6 shadow-lg shadow-amber-600/20 active:scale-[0.97]">
+                className="w-full py-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-bold rounded-2xl transition-all disabled:opacity-60 flex items-center justify-center gap-2 mt-6 shadow-lg shadow-amber-600/20 active:scale-[0.97] tap-highlight">
                 {isLoading ? (<><Loader2 size={20} className="animate-spin" /> Création en cours...</>) : 'Créer mon compte'}
               </button>
 
-              <p className="text-center text-xs text-stone-500">
+              <p className="text-center text-xs text-stone-500 pb-4">
                 En créant un compte, vous acceptez nos conditions d'utilisation
               </p>
             </div>
@@ -276,9 +284,9 @@ const InputField: React.FC<InputFieldProps> = ({
       {hint && <span className="text-stone-500 normal-case font-normal"> ({hint})</span>}
     </label>
     <div className="relative">
-      <div className="absolute left-3 top-3.5 text-stone-400">{icon}</div>
+      <div className="absolute left-3 top-[15px] text-stone-400">{icon}</div>
       <input type={type} value={value} onChange={onChange}
-        className={`w-full bg-white/10 backdrop-blur-sm border ${error ? 'border-red-500/50' : 'border-white/20'} text-white rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-all placeholder:text-stone-500`}
+        className={`w-full glass-strong text-white rounded-2xl pl-10 pr-4 py-[14px] focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-all placeholder:text-stone-500 ${error ? 'ring-1 ring-red-500/50' : ''}`}
         placeholder={placeholder} />
     </div>
     {error && <p className="text-red-400 text-xs mt-1">{error}</p>}
