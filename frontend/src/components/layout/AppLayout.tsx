@@ -97,7 +97,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-2 cursor-pointer" onClick={() => onNavigate('dashboard')}>
               <div className="w-8 h-8 rounded-lg overflow-hidden">
-                <img src="/logo.png" alt="E-Trans" className="w-full h-full object-contain" />
+                <img src="/logo.webp" alt="E-Trans" className="w-full h-full object-contain" />
               </div>
               <div className="hidden sm:block">
                 <span className="font-bold text-lg">E-Trans</span>

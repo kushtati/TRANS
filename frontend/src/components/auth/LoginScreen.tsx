@@ -60,7 +60,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
       {/* Background */}
       <div className="absolute inset-0">
-        <img src="/hero-bg.png" alt="" className="w-full h-full object-cover" />
+        <img src="/hero-bg.webp" alt="" className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-b from-stone-900/75 via-stone-900/65 to-stone-950/92" />
       </div>
 
@@ -81,7 +81,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           {/* Logo */}
           <div className="text-center mb-8 animate-fade-up stagger-1">
             <div className="w-20 h-20 mx-auto mb-4 animate-float">
-              <img src="/logo.png" alt="E-Trans" className="w-full h-full object-contain drop-shadow-[0_4px_20px_rgba(245,158,11,0.12)]" />
+              <img src="/logo.webp" alt="E-Trans" className="w-full h-full object-contain drop-shadow-[0_4px_20px_rgba(245,158,11,0.12)]" />
             </div>
             <h2 className="text-[26px] font-bold text-white tracking-tight">Bienvenue</h2>
             <p className="text-stone-400 text-[13px] mt-1">Connectez-vous à votre compte</p>

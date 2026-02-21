@@ -94,7 +94,7 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({ email, onB
     return (
       <div className="min-h-[100dvh] relative flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0">
-          <img src="/hero-bg.png" alt="" className="w-full h-full object-cover" />
+          <img src="/hero-bg.webp" alt="" className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-b from-stone-900/70 via-stone-900/60 to-stone-950/90" />
         </div>
         <div className="text-center animate-scale-in relative z-10">
@@ -114,7 +114,7 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({ email, onB
 
       {/* Background */}
       <div className="absolute inset-0">
-        <img src="/hero-bg.png" alt="" className="w-full h-full object-cover" />
+        <img src="/hero-bg.webp" alt="" className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-b from-stone-900/70 via-stone-900/60 to-stone-950/90" />
       </div>
       

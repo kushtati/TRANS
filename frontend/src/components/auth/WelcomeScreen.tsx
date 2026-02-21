@@ -15,7 +15,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onRegiste
       {/* Background — cinematic port image */}
       <div className="absolute inset-0">
         <img
-          src="/hero-bg.png"
+          src="/hero-bg.webp"
           alt=""
           className="w-full h-full object-cover animate-fade-in"
         />
@@ -35,7 +35,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onRegiste
         <div className="text-center mb-8 animate-fade-up">
           <div className="inline-flex items-center justify-center w-36 h-36 sm:w-44 sm:h-44 mb-6 animate-float">
             <img 
-              src="/logo.png" 
+              src="/logo.webp" 
               alt="E-Trans" 
               className="w-full h-full object-contain drop-shadow-[0_8px_32px_rgba(245,158,11,0.15)]" 
             />
