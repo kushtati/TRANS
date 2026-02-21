@@ -1,9 +1,9 @@
 // src/components/ShipmentDetail/ShipmentFinance.tsx
 
 import React, { useState, useMemo } from 'react';
-import { Plus, Wallet, CheckCircle2, Clock, Loader2, X, AlertCircle, AlertTriangle, Trash2 } from 'lucide-react';
+import { Plus, Wallet, CheckCircle2, Clock, Loader2, X, AlertCircle, AlertTriangle, Trash2, Zap } from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
-import type { Shipment, ExpenseType, ExpenseCategory } from '../../types';
+import type { Shipment, ExpenseType, ExpenseCategory, ContainerType } from '../../types';
 
 interface ShipmentFinanceProps {
   shipment: Shipment;
@@ -59,6 +59,9 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
   const [payingId, setPayingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [showPrefillModal, setShowPrefillModal] = useState(false);
+  const [isPrefilling, setIsPrefilling] = useState(false);
+  const [prefillItems, setPrefillItems] = useState<Array<{ category: ExpenseCategory; description: string; amount: number; reference: string; selected: boolean }>>([]);
 
   const [newExpense, setNewExpense] = useState({
     type: 'DISBURSEMENT' as ExpenseType,
@@ -67,6 +70,144 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
     amount: '',
     reference: '',
   });
+
+  // ==========================================
+  // Pre-fill typical expenses based on dossier
+  // ==========================================
+  const generateTypicalExpenses = () => {
+    const items: Array<{ category: ExpenseCategory; description: string; amount: number; reference: string; selected: boolean }> = [];
+    const containers = shipment.containers || [];
+    const nbContainers = containers.length || 1;
+
+    // Helper: check if any container is reefer
+    const hasReefer = containers.some(c => c.type?.includes('REEFER'));
+    // Helper: check container sizes
+    const has40 = containers.some(c => c.type?.includes('40'));
+    const has20 = containers.some(c => !c.type?.includes('40'));
+
+    // ===== 1. DOUANE: Use actual duty values if available =====
+    if (shipment.dutyDD && shipment.dutyDD > 0) {
+      items.push({ category: 'DD', description: 'Droit de Douane', amount: shipment.dutyDD, reference: shipment.quittanceNumber || '', selected: true });
+    }
+    if (shipment.dutyTVA && shipment.dutyTVA > 0) {
+      items.push({ category: 'TVA', description: 'TVA', amount: shipment.dutyTVA, reference: shipment.quittanceNumber || '', selected: true });
+    }
+    if (shipment.dutyRTL && shipment.dutyRTL > 0) {
+      items.push({ category: 'RTL', description: 'RTL', amount: shipment.dutyRTL, reference: shipment.quittanceNumber || '', selected: true });
+    }
+    if (shipment.dutyPC && shipment.dutyPC > 0) {
+      items.push({ category: 'PC', description: 'Prélèvement Communautaire', amount: shipment.dutyPC, reference: shipment.quittanceNumber || '', selected: true });
+    }
+    if (shipment.dutyCA && shipment.dutyCA > 0) {
+      items.push({ category: 'CA', description: 'Centime Additionnel', amount: shipment.dutyCA, reference: shipment.quittanceNumber || '', selected: true });
+    }
+    if (shipment.dutyBFU && shipment.dutyBFU > 0) {
+      items.push({ category: 'BFU', description: 'Bordereau de Frais Unique', amount: shipment.dutyBFU, reference: shipment.quittanceNumber || '', selected: true });
+    }
+
+    // If no duties filled yet, add placeholder with totalDuties
+    if (items.length === 0 && shipment.totalDuties && shipment.totalDuties > 0) {
+      items.push({ category: 'DD', description: 'Droits et Taxes (total)', amount: shipment.totalDuties, reference: '', selected: true });
+    }
+
+    // DDI Fee
+    if (shipment.ddiNumber) {
+      items.push({ category: 'DDI_FEE', description: 'Frais DDI', amount: 0, reference: `DDI ${shipment.ddiNumber}`, selected: true });
+    }
+
+    // ===== 2. TERMINAL (Conakry Terminal / Bolloré) =====
+    // Tarifs basés sur dossier réel — par conteneur
+    containers.forEach((c, idx) => {
+      const prefix = nbContainers > 1 ? `TC${idx + 1} ` : '';
+      const is40 = c.type?.includes('40');
+      const isReefer = c.type?.includes('REEFER');
+
+      // Acconage: ~1.2M (20') / ~1.75M (40' reefer)
+      const acconage = is40 ? (isReefer ? 1750000 : 1350000) : (isReefer ? 1200000 : 900000);
+      items.push({ category: 'ACCONAGE', description: `${prefix}Acconage ${is40 ? "40'" : "20'"} ${isReefer ? 'Frigo' : 'Dry'}`, amount: acconage, reference: '', selected: true });
+
+      // Branchement (reefer only) — ~347K/jour × jours estimés
+      if (isReefer) {
+        const dailyRate = is40 ? 347000 : 250000;
+        const days = 6; // estimate
+        items.push({ category: 'BRANCHEMENT', description: `${prefix}Branchement Frigo (${days}j)`, amount: dailyRate * days, reference: '', selected: true });
+      }
+
+      // Manutention vide: ~320K (40') / ~220K (20')
+      items.push({ category: 'MANUTENTION', description: `${prefix}Manutention ${is40 ? "40'" : "20'"} Vide`, amount: is40 ? 320000 : 220000, reference: '', selected: true });
+
+      // Passage à terre: ~615K (40') / ~420K (20')
+      items.push({ category: 'PASSAGE_TERRE', description: `${prefix}Passage Terre Plein ${is40 ? "40'" : "20'"}`, amount: is40 ? 615000 : 420000, reference: '', selected: true });
+
+      // Sécurité Terminal: ~175K (40') / ~130K (20')
+      items.push({ category: 'SECURITE_TERMINAL', description: `${prefix}Redevance Sécurité ${is40 ? "40'" : "20'"}`, amount: is40 ? 175000 : 130000, reference: '', selected: true });
+
+      // Relevage: ~447K (40') / ~310K (20')
+      items.push({ category: 'RELEVAGE', description: `${prefix}Relevage ${is40 ? "40'" : "20'"} Plein`, amount: is40 ? 447000 : 310000, reference: '', selected: true });
+    });
+
+    // ===== 3. ARMATEUR (CMA CGM / MSC / ...) =====
+    // Frais de dossier import: ~273K (fixe)
+    items.push({ category: 'DO_FEE', description: 'Frais de dossier import', amount: 273000, reference: '', selected: true });
+
+    // Gestion manifeste: ~482K × nb TC
+    items.push({ category: 'MANIFEST_FEE', description: `Gestion manifeste (${nbContainers} TC)`, amount: 482000 * nbContainers, reference: '', selected: true });
+
+    // Bon à enlever: ~897K × nb TC
+    items.push({ category: 'DO_FEE', description: `Bon à enlever (${nbContainers} TC)`, amount: 897000 * nbContainers, reference: '', selected: true });
+
+    // Dommage conteneur: ~142K × nb TC
+    items.push({ category: 'CONTAINER_DAMAGE', description: `Damage fees (${nbContainers} TC)`, amount: 142000 * nbContainers, reference: '', selected: false });
+
+    // Sécurité armateur: ~275K × nb TC
+    items.push({ category: 'SECURITE_MSC', description: `Redevance sécurité (${nbContainers} TC)`, amount: 275000 * nbContainers, reference: '', selected: true });
+
+    // Surcharge Opération: ~750K × nb TC
+    items.push({ category: 'SURCHARGE', description: `Surcharge opération (${nbContainers} TC)`, amount: 750000 * nbContainers, reference: '', selected: true });
+
+    // PAC / Redevance marchandises: ~221K × TEU (40' = 2 TEU)
+    const totalTEU = containers.reduce((s, c) => s + (c.type?.includes('40') ? 2 : 1), 0) || 2;
+    items.push({ category: 'PAC', description: `Redevance marchandises (${totalTEU} TEU)`, amount: 221000 * totalTEU, reference: '', selected: true });
+
+    // ===== 4. SCANNER =====
+    items.push({ category: 'SCANNER', description: 'Frais circuit / scanner', amount: 2000000, reference: '', selected: true });
+
+    // ===== 5. TRANSPORT =====
+    items.push({ category: 'TRANSPORT', description: `Transport (${nbContainers} TC)`, amount: 5500000 * nbContainers, reference: '', selected: true });
+
+    // ===== 6. HONORAIRES =====
+    items.push({ category: 'HONORAIRES', description: `Honoraires transit (${nbContainers} TC)`, amount: 1500000 * nbContainers, reference: '', selected: true });
+
+    // ===== 7. DIVERS =====
+    items.push({ category: 'AUTRE', description: 'Frais Orange Money / paiement', amount: 200000, reference: '', selected: false });
+
+    setPrefillItems(items);
+    setShowPrefillModal(true);
+  };
+
+  const handlePrefillSubmit = async () => {
+    const selected = prefillItems.filter(i => i.selected && i.amount > 0);
+    if (selected.length === 0) return;
+    setIsPrefilling(true);
+    try {
+      for (const item of selected) {
+        await api.post('/finance/expenses', {
+          shipmentId: shipment.id,
+          type: 'DISBURSEMENT' as ExpenseType,
+          category: item.category,
+          description: item.description,
+          amount: item.amount,
+          reference: item.reference || undefined,
+        });
+      }
+      setShowPrefillModal(false);
+      onRefresh();
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.message);
+    } finally {
+      setIsPrefilling(false);
+    }
+  };
 
   // Calculate totals
   const { totalProvisions, totalDisbursements, paidDisbursements, unpaidDisbursements, balance } = useMemo(() => {
@@ -194,8 +335,17 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
         </div>
       )}
 
-      {/* Add Button */}
-      <div className="flex justify-end">
+      {/* Add Buttons */}
+      <div className="flex justify-end gap-2">
+        {(!shipment.expenses || shipment.expenses.filter(e => e.type === 'DISBURSEMENT').length === 0) && (
+          <button
+            onClick={generateTypicalExpenses}
+            className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-xl text-sm font-medium hover:bg-amber-600"
+          >
+            <Zap size={16} />
+            Pré-remplir débours
+          </button>
+        )}
         <button
           onClick={() => setShowAddModal(true)}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700"
@@ -391,6 +541,100 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
                 {isAdding && <Loader2 size={18} className="animate-spin" />}
                 Ajouter
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Prefill Modal */}
+      {showPrefillModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200">
+              <div>
+                <h3 className="font-semibold text-lg flex items-center gap-2">
+                  <Zap size={20} className="text-amber-500" />
+                  Pré-remplir les débours
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Basé sur {shipment.containers?.length || 1} conteneur(s) — montants estimés modifiables
+                </p>
+              </div>
+              <button onClick={() => setShowPrefillModal(false)} className="p-2 hover:bg-slate-100 rounded-lg">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {Object.entries(categoryGroups).map(([groupName, cats]) => {
+                const groupItems = prefillItems.filter(i => (cats as string[]).includes(i.category));
+                if (groupItems.length === 0) return null;
+                const groupTotal = groupItems.filter(i => i.selected).reduce((s, i) => s + i.amount, 0);
+                return (
+                  <div key={groupName} className="border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                      <span className="text-sm font-medium text-slate-700">{groupName}</span>
+                      <span className="text-xs font-semibold text-slate-600">{groupTotal.toLocaleString('fr-FR')} GNF</span>
+                    </div>
+                    <div className="divide-y divide-slate-100">
+                      {groupItems.map((item) => {
+                        const globalIdx = prefillItems.indexOf(item);
+                        return (
+                          <div key={globalIdx} className="flex items-center gap-3 px-3 py-2.5">
+                            <input
+                              type="checkbox"
+                              checked={item.selected}
+                              onChange={() => {
+                                setPrefillItems(prev => prev.map((p, i) => i === globalIdx ? { ...p, selected: !p.selected } : p));
+                              }}
+                              className="w-4 h-4 text-blue-600 rounded shrink-0"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-slate-800 truncate">{item.description}</p>
+                            </div>
+                            <input
+                              type="number"
+                              value={item.amount || ''}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value) || 0;
+                                setPrefillItems(prev => prev.map((p, i) => i === globalIdx ? { ...p, amount: val } : p));
+                              }}
+                              className="w-28 text-right text-sm border border-slate-300 rounded-lg px-2 py-1.5"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="p-4 border-t border-slate-200 space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-slate-600">
+                  {prefillItems.filter(i => i.selected && i.amount > 0).length} lignes sélectionnées
+                </span>
+                <span className="font-bold text-slate-900">
+                  {prefillItems.filter(i => i.selected).reduce((s, i) => s + i.amount, 0).toLocaleString('fr-FR')} GNF
+                </span>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowPrefillModal(false)}
+                  className="flex-1 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-medium"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handlePrefillSubmit}
+                  disabled={isPrefilling || prefillItems.filter(i => i.selected && i.amount > 0).length === 0}
+                  className="flex-1 py-2.5 bg-amber-500 text-white rounded-xl font-medium disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {isPrefilling ? <Loader2 size={18} className="animate-spin" /> : <Zap size={18} />}
+                  {isPrefilling ? 'Création...' : 'Créer les débours'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

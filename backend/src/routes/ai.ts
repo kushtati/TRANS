@@ -215,36 +215,39 @@ const blUpload = multer({
   },
 });
 
-const BL_EXTRACTION_PROMPT = `Tu es un expert en transit maritime et dédouanement en Guinée Conakry. Analyse ce document (Bill of Lading / Connaissement / BL) et extrais TOUTES les informations possibles.
+const BL_EXTRACTION_PROMPT = `Tu es un expert en transit maritime et dédouanement en Guinée Conakry. Analyse ce document (Bill of Lading / Connaissement / BL / Facture / Packing List / DDI) et extrais TOUTES les informations possibles.
 
 RETOURNE UNIQUEMENT un objet JSON valide, sans markdown, sans texte avant ou après.
 
 STRUCTURE JSON ATTENDUE (remplis TOUS les champs — si introuvable, utilise "" pour texte et 0 pour nombres) :
 {
-  "blNumber": "numéro complet du BL/connaissement (ex: MEDU09243710, MAEU123456789)",
-  "clientName": "nom complet du CONSIGNEE/DESTINATAIRE (pas le shipper)",
-  "clientNif": "NIF ou numéro fiscal du destinataire si visible",
+  "blNumber": "numéro complet du BL/connaissement (ex: IVL0187218, MEDU09243710, MAEU123456789)",
+  "clientName": "nom complet du CONSIGNEE/DESTINATAIRE (pas le shipper, pas le notify party)",
+  "clientNif": "NIF ou numéro fiscal du destinataire si visible (ex: 9599149617M)",
   "clientPhone": "téléphone du destinataire si visible",
-  "clientAddress": "adresse complète du destinataire",
-  "description": "description COMPLÈTE de la marchandise avec détails (ex: RIZ BRISE 5% EN SACS DE 25KG)",
-  "hsCode": "code SH/HS (ex: 1006.30, 8703.23) — cherche dans les champs HS Code, Commodity Code, Tariff",
+  "clientAddress": "adresse complète du destinataire (ex: KALOUM-ALMAMYA, CONAKRY)",
+  "description": "description COMPLÈTE et DÉTAILLÉE de la marchandise (ex: PILONS DE POULET CONGELES, RIZ BRISE 5% EN SACS DE 25KG)",
+  "hsCode": "code SH/HS (ex: 02071400, 1006.30, 8703.23) — cherche dans HS Code, Commodity Code, Tariff, Nomenclature tarifaire",
   "packaging": "type d'emballage : Sac, Carton, Palette, Fût, Vrac, Conteneur, Caisse, Ballot, Rouleau",
   "packageCount": 0,
   "grossWeight": 0,
   "netWeight": 0,
   "cifValue": 0,
+  "fobValue": 0,
+  "freightValue": 0,
+  "insuranceValue": 0,
   "cifCurrency": "USD",
-  "vesselName": "nom complet du navire/vessel (ex: MSC BANU III, MAERSK SELETAR)",
-  "voyageNumber": "numéro de voyage (ex: XA545A, 234W)",
-  "portOfLoading": "port de chargement en MAJUSCULES (ex: ANTWERP, SHANGHAI, ISTANBUL)",
-  "portOfDischarge": "port de déchargement — utilise CONAKRY si Conakry/Guinée détecté, sinon KAMSAR",
-  "eta": "date d'arrivée estimée au format YYYY-MM-DD si visible (ETA, Arrival Date)",
-  "supplierName": "nom complet du SHIPPER/EXPÉDITEUR (première partie du BL)",
-  "supplierCountry": "pays du shipper en MAJUSCULES (ex: NETHERLANDS, CHINA, TURKEY, INDIA)",
+  "vesselName": "nom complet du navire/vessel (ex: CMA CGM AMBITION, MSC BANU III)",
+  "voyageNumber": "numéro de voyage (ex: 0MRJRW1MA, XA545A)",
+  "portOfLoading": "port de chargement en MAJUSCULES (ex: MONTREAL, QC, ANTWERP, SHANGHAI)",
+  "portOfDischarge": "port de déchargement — CONAKRY si Conakry/Guinée détecté, sinon KAMSAR",
+  "eta": "date d'arrivée estimée au format YYYY-MM-DD si visible (ETA, Arrival Date, Date navire)",
+  "supplierName": "nom complet du SHIPPER/EXPÉDITEUR (en haut du BL, ou vendeur sur la facture)",
+  "supplierCountry": "pays du shipper en MAJUSCULES déduit de l'adresse ou du port (ex: CANADA, NETHERLANDS, CHINA, TURKEY, BRAZIL, INDIA, USA)",
   "customsRegime": "IM4 par défaut (mise à consommation). IM5 si temporaire, IM7 si entrepôt, TR si transit",
   "containers": [
     {
-      "number": "numéro conteneur ISO complet (4 lettres + 7 chiffres, ex: SEGU9759487)",
+      "number": "numéro conteneur ISO (4 lettres + 7 chiffres, ex: CAIU5534280, CGMU5621560)",
       "type": "DRY_20 | DRY_40 | DRY_40HC | REEFER_20 | REEFER_40 | REEFER_40HR",
       "sealNumber": "numéro de scellé/plomb/seal",
       "grossWeight": 0,
@@ -254,16 +257,19 @@ STRUCTURE JSON ATTENDUE (remplis TOUS les champs — si introuvable, utilise "" 
 }
 
 RÈGLES CRITIQUES :
-1. CONSIGNEE = client/destinataire. SHIPPER = fournisseur/expéditeur. Ne les confonds JAMAIS.
-2. grossWeight et packageCount au niveau racine = TOTAUX de tout le BL.
-3. grossWeight et packageCount dans chaque conteneur = valeurs PAR conteneur.
+1. CONSIGNEE = client/destinataire final en Guinée. SHIPPER = fournisseur/expéditeur à l'étranger. Ne les confonds JAMAIS.
+2. grossWeight et packageCount au niveau racine = TOTAUX de tout le BL (somme de tous les conteneurs).
+3. grossWeight et packageCount dans chaque conteneur = valeurs PAR conteneur (cargo weight, sans la tare du conteneur).
 4. Si le poids est en tonnes (MT/T), multiplie par 1000 pour convertir en kg.
-5. Cherche la valeur CIF/FOB dans les champs "Declared Value", "Freight", "Total Value".
-6. Type conteneur : 20' → DRY_20, 40' → DRY_40, 40'HC/HQ → DRY_40HC, RF/Reefer 20' → REEFER_20, RF/Reefer 40' → REEFER_40. Si non précisé → DRY_40HC.
-7. Pour le pays du shipper : déduis-le de l'adresse du shipper ou du port de chargement.
-8. Si packaging non explicite : déduis du contexte (riz/ciment → Sac, pièces auto → Carton, liquides → Fût).
-9. Extrais CHAQUE conteneur listé, même s'il y en a beaucoup.
-10. Le code HS peut apparaître sous : HS Code, Commodity Code, Harmonized System, Tariff Number.
+5. Valeur commerciale : CIF = FOB + Freight + Insurance. Cherche "Declared Value", "CIF Value", "Invoice Total", "Total Amount".
+6. Type conteneur : 20' → DRY_20, 40' → DRY_40, 40'HC/HQ → DRY_40HC, RF/Reefer 20' → REEFER_20, RF/Reefer 40'/40'RH/45R1 → REEFER_40, 40'HR → REEFER_40HR. Si non précisé et produit congelé → REEFER_40.
+7. Pour le pays du shipper : déduis de l'adresse (Netherlands → NETHERLANDS, Canada → CANADA, etc.) ou du port de chargement (Montreal → CANADA, Antwerp → BELGIUM).
+8. Si packaging non explicite : déduis (poulet/viande → Carton, riz/ciment → Sac, pièces auto → Carton, liquides → Fût, bobines → Rouleau).
+9. Extrais CHAQUE conteneur listé, même s'il y en a beaucoup. Un BL peut avoir 1 à 50+ conteneurs.
+10. Le code HS peut apparaître sous : HS Code, Commodity Code, Harmonized System, Tariff Number, Position tarifaire, Nomenclature.
+11. Si le document est une FACTURE (Invoice), extrais CIF/FOB value, supplierName, description, quantity.
+12. Si le document est un PACKING LIST, extrais les poids net/brut, conteneurs, colis.
+13. Si le document est une DDI, extrais le numéro DDI, NIF client, valeur FOB/CAF, pays provenance/origine.
 
 Extrais le MAXIMUM d'informations. Mieux vaut deviner intelligemment que laisser vide.`;
 

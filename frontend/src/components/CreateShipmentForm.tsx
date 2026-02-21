@@ -117,7 +117,16 @@ export const CreateShipmentForm: React.FC<CreateShipmentFormProps> = ({ onSucces
       // Numeric fields
       if (data.packageCount > 0) { u.packageCount = String(Math.round(data.packageCount)); filled.add('packageCount'); }
       if (data.grossWeight > 0) { u.grossWeight = String(Math.round(data.grossWeight * 100) / 100); filled.add('grossWeight'); }
-      if (data.cifValue > 0) { u.cifValue = String(Math.round(data.cifValue * 100) / 100); filled.add('cifValue'); }
+      // CIF value: prefer cifValue, else calculate from fob+freight+insurance
+      if (data.cifValue > 0) {
+        u.cifValue = String(Math.round(data.cifValue * 100) / 100); filled.add('cifValue');
+      } else if (data.fobValue > 0) {
+        const fob = data.fobValue || 0;
+        const freight = data.freightValue || 0;
+        const insurance = data.insuranceValue || 0;
+        const cif = fob + freight + insurance;
+        if (cif > 0) { u.cifValue = String(Math.round(cif * 100) / 100); filled.add('cifValue'); }
+      }
       // Containers
       if (data.containers?.length > 0) {
         u.containers = data.containers.map((c: any) => ({
