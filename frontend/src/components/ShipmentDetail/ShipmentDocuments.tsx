@@ -2,7 +2,7 @@
 
 import React, { useState, useRef } from 'react';
 import { Plus, FileText, Download, Trash2, Eye, Loader2, X, AlertCircle, Upload, Link2 } from 'lucide-react';
-import { api, ApiError } from '../../lib/api';
+import { api, ApiError, getAccessToken } from '../../lib/api';
 import type { Shipment, DocumentType } from '../../types';
 
 interface ShipmentDocumentsProps {
@@ -88,10 +88,15 @@ export const ShipmentDocuments: React.FC<ShipmentDocumentsProps> = ({ shipment, 
     const formData = new FormData();
     formData.append('file', file);
 
+    const headers: Record<string, string> = {};
+    const token = getAccessToken();
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
     const res = await fetch(
       `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/upload`,
       {
         method: 'POST',
+        headers,
         body: formData,
         credentials: 'include',
       }
