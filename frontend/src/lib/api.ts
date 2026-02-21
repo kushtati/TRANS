@@ -240,6 +240,63 @@ class ApiClient {
   put = <T>(endpoint: string, data?: unknown) => this.request<T>('PUT', endpoint, data);
   patch = <T>(endpoint: string, data?: unknown) => this.request<T>('PATCH', endpoint, data);
   delete = <T>(endpoint: string) => this.request<T>('DELETE', endpoint);
+
+  /**
+   * Download a file (PDF, etc.) with proper auth headers.
+   * Opens the file in a new tab or triggers a download.
+   */
+  async downloadFile(endpoint: string, filename?: string): Promise<void> {
+    const url = `${API_BASE}${endpoint}`;
+    const headers: Record<string, string> = {};
+    if (_accessToken) {
+      headers['Authorization'] = `Bearer ${_accessToken}`;
+    }
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers,
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      // Try token refresh on 401
+      if (response.status === 401 && _refreshToken) {
+        await this.handleTokenRefresh('GET', endpoint);
+        // Retry after refresh
+        const retryHeaders: Record<string, string> = {};
+        if (_accessToken) retryHeaders['Authorization'] = `Bearer ${_accessToken}`;
+        const retryResponse = await fetch(url, { method: 'GET', headers: retryHeaders, credentials: 'include' });
+        if (!retryResponse.ok) throw new ApiError('Erreur lors du téléchargement', retryResponse.status);
+        const blob = await retryResponse.blob();
+        this.triggerDownload(blob, filename || this.extractFilename(retryResponse) || 'document.pdf');
+        return;
+      }
+      throw new ApiError('Erreur lors du téléchargement', response.status);
+    }
+
+    const blob = await response.blob();
+    this.triggerDownload(blob, filename || this.extractFilename(response) || 'document.pdf');
+  }
+
+  private extractFilename(response: Response): string | null {
+    const disposition = response.headers.get('Content-Disposition');
+    if (disposition) {
+      const match = disposition.match(/filename=([^;\s]+)/);
+      if (match) return match[1].replace(/["']/g, '');
+    }
+    return null;
+  }
+
+  private triggerDownload(blob: Blob, filename: string): void {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
 }
 
 export const api = new ApiClient();

@@ -180,7 +180,7 @@ router.get('/shipment/:id/pdf', async (req: Request, res: Response) => {
 // Generate a professional FACTURE (invoice) PDF
 // ============================================
 
-router.get('/shipment/:id/invoice', async (req: Request, res: Response) => {
+router.get('/shipment/:id/facture', async (req: Request, res: Response) => {
   try {
     const shipment = await prisma.shipment.findFirst({
       where: { id: req.params.id, companyId: req.user!.companyId },

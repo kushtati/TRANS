@@ -298,8 +298,7 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
   };
 
   const handleDownloadInvoice = () => {
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-    window.open(`${baseUrl}/export/shipment/${shipment.id}/invoice`, '_blank');
+    api.downloadFile(`/export/shipment/${shipment.id}/facture`, `facture-${shipment.trackingNumber || shipment.id}.pdf`);
   };
 
   const provisions = shipment.expenses?.filter(e => e.type === 'PROVISION') || [];

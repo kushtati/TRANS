@@ -129,8 +129,7 @@ export const ShipmentDetail: React.FC<ShipmentDetailProps> = ({ shipmentId, onBa
               </button>
               <button
                 onClick={() => {
-                  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-                  window.open(`${baseUrl}/export/shipment/${shipmentId}/pdf`, '_blank');
+                  api.downloadFile(`/export/shipment/${shipmentId}/pdf`, `dossier-${shipment?.trackingNumber || shipmentId}.pdf`);
                 }}
                 className="p-2 rounded-lg hover:bg-slate-100 text-slate-600"
                 title="Télécharger PDF"
