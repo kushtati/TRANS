@@ -36,7 +36,7 @@ coverage/
 .vercel
 .env*.local
 *.pdf
-*.png
+/*.png
 dossier1_ocr.txt
 pages_b64.txt
 .venv/
