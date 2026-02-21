@@ -1,7 +1,7 @@
 // src/components/ShipmentDetail/ShipmentFinance.tsx
 
 import React, { useState, useMemo } from 'react';
-import { Plus, Wallet, CheckCircle2, Clock, Loader2, X, AlertCircle, AlertTriangle, Trash2, Zap } from 'lucide-react';
+import { Plus, Wallet, CheckCircle2, Clock, Loader2, X, AlertCircle, AlertTriangle, Trash2, Zap, Download, CreditCard } from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
 import type { Shipment, ExpenseType, ExpenseCategory } from '../../types';
 
@@ -62,6 +62,8 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
   const [showPrefillModal, setShowPrefillModal] = useState(false);
   const [isPrefilling, setIsPrefilling] = useState(false);
   const [prefillItems, setPrefillItems] = useState<Array<{ category: ExpenseCategory; description: string; amount: number; reference: string; selected: boolean }>>([]);
+  const [isPayingAll, setIsPayingAll] = useState(false);
+  const [showPayAllConfirm, setShowPayAllConfirm] = useState(false);
 
   const [newExpense, setNewExpense] = useState({
     type: 'DISBURSEMENT' as ExpenseType,
@@ -282,6 +284,24 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
     }
   };
 
+  const handlePayAll = async () => {
+    setIsPayingAll(true);
+    setShowPayAllConfirm(false);
+    try {
+      await api.post('/finance/expenses/pay-all', { shipmentId: shipment.id });
+      onRefresh();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsPayingAll(false);
+    }
+  };
+
+  const handleDownloadInvoice = () => {
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    window.open(`${baseUrl}/export/shipment/${shipment.id}/invoice`, '_blank');
+  };
+
   const provisions = shipment.expenses?.filter(e => e.type === 'PROVISION') || [];
   const disbursements = shipment.expenses?.filter(e => e.type === 'DISBURSEMENT') || [];
 
@@ -329,8 +349,33 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
         </div>
       )}
 
-      {/* Add Buttons */}
-      <div className="flex justify-end gap-2">
+      {/* Action Buttons */}
+      <div className="flex flex-wrap gap-2">
+        {/* Pay All - shown when there are unpaid disbursements */}
+        {unpaidDisbursements > 0 && (
+          <button
+            onClick={() => setShowPayAllConfirm(true)}
+            disabled={isPayingAll}
+            className="flex items-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors shadow-sm"
+          >
+            {isPayingAll ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
+            Payer tous les frais
+          </button>
+        )}
+
+        {/* Download Invoice */}
+        {shipment.expenses && shipment.expenses.length > 0 && (
+          <button
+            onClick={handleDownloadInvoice}
+            className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 text-white rounded-xl text-sm font-medium hover:bg-slate-900 transition-colors shadow-sm"
+          >
+            <Download size={16} />
+            Télécharger la facture
+          </button>
+        )}
+
+        <div className="flex-1" />
+
         {(!shipment.expenses || shipment.expenses.filter(e => e.type === 'DISBURSEMENT').length === 0) && (
           <button
             onClick={generateTypicalExpenses}
@@ -629,6 +674,55 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
                   {isPrefilling ? 'Création...' : 'Créer les débours'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pay All Confirmation Modal */}
+      {showPayAllConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowPayAllConfirm(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
+            <div className="text-center mb-4">
+              <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <CreditCard size={24} className="text-green-600" />
+              </div>
+              <h3 className="font-semibold text-lg text-slate-900">Payer tous les frais</h3>
+              <p className="text-sm text-slate-500 mt-1">
+                Confirmer le paiement de tous les débours en attente ?
+              </p>
+            </div>
+
+            <div className="bg-green-50 rounded-xl p-4 mb-4 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-600">Débours en attente</span>
+                <span className="font-bold text-slate-900">
+                  {disbursements.filter(d => !d.paid).length} ligne(s)
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-600">Montant total</span>
+                <span className="font-bold text-green-700">
+                  {formatAmount(unpaidDisbursements)} GNF
+                </span>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowPayAllConfirm(false)}
+                className="flex-1 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-medium text-sm hover:bg-slate-200 transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handlePayAll}
+                disabled={isPayingAll}
+                className="flex-1 py-2.5 bg-green-600 text-white rounded-xl font-medium text-sm hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
+              >
+                {isPayingAll ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
+                Confirmer
+              </button>
             </div>
           </div>
         </div>

@@ -316,6 +316,93 @@ router.post('/expenses/:id/pay', async (req: Request, res: Response) => {
 });
 
 // ============================================
+// POST /api/finance/expenses/pay-all
+// Mark all unpaid disbursements for a shipment as paid
+// ============================================
+
+router.post('/expenses/pay-all', async (req: Request, res: Response) => {
+  try {
+    const { shipmentId } = req.body;
+    if (!shipmentId) {
+      return res.status(400).json({ success: false, message: 'shipmentId requis' });
+    }
+
+    // Verify shipment belongs to company
+    const shipment = await prisma.shipment.findFirst({
+      where: { id: shipmentId, companyId: req.user!.companyId },
+      select: { id: true, trackingNumber: true },
+    });
+
+    if (!shipment) {
+      return res.status(404).json({ success: false, message: 'Dossier non trouvé' });
+    }
+
+    // Find all unpaid disbursements
+    const unpaid = await prisma.expense.findMany({
+      where: { shipmentId, type: 'DISBURSEMENT', paid: false },
+    });
+
+    if (unpaid.length === 0) {
+      return res.status(400).json({ success: false, message: 'Aucun débours en attente' });
+    }
+
+    // Mark all as paid
+    const now = new Date();
+    await prisma.expense.updateMany({
+      where: { shipmentId, type: 'DISBURSEMENT', paid: false },
+      data: { paid: true, paidAt: now, paidBy: req.user!.id },
+    });
+
+    const totalPaid = unpaid.reduce((s, e) => s + e.amount, 0);
+
+    // Timeline entry
+    const userName = (await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      select: { name: true },
+    }))?.name;
+
+    await prisma.timelineEvent.create({
+      data: {
+        shipmentId,
+        action: `Tous les débours payés : ${Math.round(totalPaid).toLocaleString('fr-FR')} GNF (${unpaid.length} lignes)`,
+        description: 'Paiement groupé de tous les débours en attente',
+        userId: req.user!.id,
+        userName,
+      },
+    });
+
+    // Audit log
+    await prisma.auditLog.create({
+      data: {
+        action: 'EXPENSES_BULK_PAID',
+        entity: 'Shipment',
+        entityId: shipmentId,
+        details: {
+          count: unpaid.length,
+          totalAmount: totalPaid,
+          trackingNumber: shipment.trackingNumber,
+        },
+        userId: req.user!.id,
+      },
+    });
+
+    log.audit('Bulk pay expenses', {
+      count: unpaid.length,
+      totalAmount: totalPaid,
+      shipment: shipment.trackingNumber,
+    });
+
+    res.json({
+      success: true,
+      data: { paidCount: unpaid.length, totalPaid: Math.round(totalPaid) },
+    });
+  } catch (error) {
+    log.error('Bulk pay error', error);
+    res.status(500).json({ success: false, message: 'Erreur lors du paiement groupé' });
+  }
+});
+
+// ============================================
 // PATCH /api/finance/expenses/:id
 // Update an expense
 // ============================================
