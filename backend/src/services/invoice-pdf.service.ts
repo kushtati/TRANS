@@ -171,8 +171,13 @@ const GRAY = rgb(0.4, 0.4, 0.4);
 const WHITE = rgb(1, 1, 1);
 const RED = rgb(0.8, 0.1, 0.1);
 
-// Formatting
-const fmtN = (n: number): string => Math.round(n).toLocaleString('fr-FR');
+// Formatting — manual thousands separator (regular space) to avoid
+// narrow no-break space (U+202F) from toLocaleString on Linux/ICU
+// which is NOT in the WinAnsi charset used by pdf-lib StandardFonts.
+const fmtN = (n: number): string => {
+  const s = Math.round(n).toString();
+  return s.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+};
 
 // ==========================================
 // Main PDF Generator
@@ -455,19 +460,17 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Uint8Array>
   });
 
   const footerLines = [
-    `📍 Siège social : ${data.companyAddress || 'Almamya, Conakry'}`,
-    `📧 ${data.companyEmail || 'emergencetransitguinee11@gmail.com'}`,
-    `📞 ${data.companyPhone || '+224 628 359 711 / 625 456 146 / 669 370 021'}`,
-    `${data.companyAgrementNumber ? 'Agrément ' + data.companyAgrementNumber + ' | ' : ''}${data.companyRccm ? 'RCCM ' + data.companyRccm : ''}`,
-    `Conditions de paiement : 100% après acceptation de la facture, par chèque ou par virement bancaire`,
-    `au nom ${data.companyName.toUpperCase()} à la banque ${data.companyBankName || 'CORIS ou AFRILAND'}.${data.companyBankAccount ? ' ' + data.companyBankAccount : ''}`,
+    `Siege social : ${data.companyAddress || 'Almamya, Conakry'}`,
+    `Email : ${data.companyEmail || 'emergencetransitguinee11@gmail.com'}`,
+    `Tel : ${data.companyPhone || '+224 628 359 711 / 625 456 146 / 669 370 021'}`,
+    `${data.companyAgrementNumber ? 'Agrement ' + data.companyAgrementNumber + ' | ' : ''}${data.companyRccm ? 'RCCM ' + data.companyRccm : ''}`,
+    `Conditions de paiement : 100% apres acceptation de la facture, par cheque ou par virement bancaire`,
+    `au nom ${data.companyName.toUpperCase()} a la banque ${data.companyBankName || 'CORIS ou AFRILAND'}.${data.companyBankAccount ? ' ' + data.companyBankAccount : ''}`,
   ];
 
   let fy = footerY + 22;
   for (const fl of footerLines) {
-    // Replace emojis with simple text for PDF compatibility
-    const cleanLine = fl.replace(/📍/g, '•').replace(/📧/g, '•').replace(/📞/g, '•');
-    page.drawText(cleanLine, { x: MARGIN, y: fy, size: 6.5, font: fontRegular, color: GRAY, maxWidth: RIGHT - MARGIN });
+    page.drawText(fl, { x: MARGIN, y: fy, size: 6.5, font: fontRegular, color: GRAY, maxWidth: RIGHT - MARGIN });
     fy -= 9;
   }
 
