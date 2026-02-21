@@ -40,3 +40,4 @@ coverage/
 dossier1_ocr.txt
 pages_b64.txt
 .venv/
+fra.traineddata
