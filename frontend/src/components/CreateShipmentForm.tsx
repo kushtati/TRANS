@@ -186,7 +186,7 @@ export const CreateShipmentForm: React.FC<CreateShipmentFormProps> = ({ onSucces
   const hl = (f: string) => filledFields.has(f);
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-24">
+    <div className="min-h-screen bg-slate-50 pb-32">
       <div className="bg-white border-b border-slate-200 sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
           <button onClick={onCancel} className="p-2 hover:bg-slate-100 rounded-lg"><ArrowLeft size={20} /></button>
@@ -316,7 +316,7 @@ export const CreateShipmentForm: React.FC<CreateShipmentFormProps> = ({ onSucces
       </div>
 
       {step > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4 safe-bottom">
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4 pb-6 safe-bottom z-50" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 1.5rem))' }}>
           <div className="max-w-3xl mx-auto flex gap-3">
             {step > 1 && <button onClick={prev} className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl">Précédent</button>}
             {step < totalSteps ? (
