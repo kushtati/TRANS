@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import {
-  Zap, Search, Bell, LogOut, Menu, X,
+  Search, Bell, LogOut, Menu, X,
   LayoutDashboard, PlusCircle, Calculator,
   PieChart, Settings, MessageSquare, Users, Shield,
   type LucideIcon,
