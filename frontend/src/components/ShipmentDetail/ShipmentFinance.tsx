@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { Plus, Wallet, CheckCircle2, Clock, Loader2, X, AlertCircle, AlertTriangle, Trash2, Zap } from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
-import type { Shipment, ExpenseType, ExpenseCategory, ContainerType } from '../../types';
+import type { Shipment, ExpenseType, ExpenseCategory } from '../../types';
 
 interface ShipmentFinanceProps {
   shipment: Shipment;
@@ -78,12 +78,6 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
     const items: Array<{ category: ExpenseCategory; description: string; amount: number; reference: string; selected: boolean }> = [];
     const containers = shipment.containers || [];
     const nbContainers = containers.length || 1;
-
-    // Helper: check if any container is reefer
-    const hasReefer = containers.some(c => c.type?.includes('REEFER'));
-    // Helper: check container sizes
-    const has40 = containers.some(c => c.type?.includes('40'));
-    const has20 = containers.some(c => !c.type?.includes('40'));
 
     // ===== 1. DOUANE: Use actual duty values if available =====
     if (shipment.dutyDD && shipment.dutyDD > 0) {
