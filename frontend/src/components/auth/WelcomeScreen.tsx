@@ -17,7 +17,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onRegiste
         <img
           src="/hero-bg.webp"
           alt=""
-          className="w-full h-full object-cover object-[center_40%] md:object-[center_50%] animate-fade-in"
+          className="w-full h-full object-cover object-center animate-fade-in"
         />
         {/* Deep warm overlay for contrast & readability */}
         <div className="absolute inset-0 bg-gradient-to-b from-amber-950/50 via-stone-900/30 to-stone-950/90" />
