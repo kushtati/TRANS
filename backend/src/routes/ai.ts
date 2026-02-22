@@ -727,17 +727,20 @@ router.post('/auto-position-fields', blUpload.single('file'), async (req: Reques
     }
 
     // Accept either an uploaded file or a templateId to fetch from DB
+    // Note: templateId can come from JSON body (parsed by express.json()) or from multipart form field
     let base64Data: string;
     let mimeType = 'application/pdf';
+
+    const templateId = req.body?.templateId;
 
     if (req.file) {
       base64Data = req.file.buffer.toString('base64');
       mimeType = req.file.mimetype;
       (req as any).file = null;
-    } else if (req.body.templateId) {
+    } else if (templateId) {
       // Fetch template PDF from disk
       const template = await prisma.invoiceTemplate.findFirst({
-        where: { id: req.body.templateId, companyId: req.user!.companyId },
+        where: { id: templateId, companyId: req.user!.companyId },
       });
       if (!template) {
         return res.status(404).json({ success: false, message: 'Template non trouvé' });
