@@ -32,6 +32,7 @@ model Company {
   shipments Shipment[]
   clients   Client[]
   invoices  Invoice[]
+  invoiceTemplates InvoiceTemplate[]
 
   @@index([slug])
   @@map("companies")
@@ -442,6 +443,49 @@ model Notification {
   @@index([read])
   @@index([createdAt])
   @@map("notifications")
+}
+
+// ==================== TEMPLATES FACTURE (PDF Overlay) ====================
+
+model InvoiceTemplate {
+  id            String   @id @default(cuid())
+  name          String                        // "Facture Standard 2026"
+  fileUrl       String                        // URL vers le PDF vierge original
+  thumbnailUrl  String?                       // Preview image (page 1 rendue en PNG)
+  canvasWidth   Float    @default(595.28)     // Largeur page en points PDF (A4 = 595.28)
+  canvasHeight  Float    @default(841.89)     // Hauteur page en points PDF (A4 = 841.89)
+  isDefault     Boolean  @default(false)      // Template par défaut de l'entreprise
+
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  fields        TemplateField[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([companyId])
+  @@map("invoice_templates")
+}
+
+model TemplateField {
+  id          String  @id @default(cuid())
+  fieldKey    String                          // "client_name", "total_ttc", "invoice_number" ...
+  label       String                          // Libellé affiché dans le designer
+  posX        Float                           // Position X en points PDF (0 = gauche)
+  posY        Float                           // Position Y en points PDF (0 = bas)
+  fontSize    Int     @default(10)
+  fontFamily  String  @default("Helvetica")   // Helvetica, Courier, TimesRoman
+  fontWeight  String  @default("normal")      // "normal" | "bold"
+  textAlign   String  @default("left")        // "left" | "center" | "right"
+  color       String  @default("#000000")     // Couleur hex
+  maxWidth    Float?                          // Largeur max en points (word-wrap)
+
+  templateId  String
+  template    InvoiceTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([templateId])
+  @@map("template_fields")
 }
 
 // ==================== AUDIT ====================

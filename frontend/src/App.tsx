@@ -29,6 +29,7 @@ const AccountingView = lazy(() => import('./pages/AccountingView').then(m => ({ 
 const AuditTrailView = lazy(() => import('./pages/AuditTrailView').then(m => ({ default: m.AuditTrailView })));
 const EditShipmentView = lazy(() => import('./pages/EditShipmentView').then(m => ({ default: m.EditShipmentView })));
 const TeamManagementView = lazy(() => import('./pages/TeamManagementView').then(m => ({ default: m.TeamManagementView })));
+const TemplateDesignerView = lazy(() => import('./pages/TemplateDesignerView').then(m => ({ default: m.TemplateDesignerView })));
 
 const ViewLoader = () => (
   <div className="flex items-center justify-center min-h-[300px]">
@@ -36,7 +37,7 @@ const ViewLoader = () => (
   </div>
 );
 
-type View = 'dashboard' | 'create' | 'detail' | 'settings' | 'shipment' | 'accounting' | 'calculator' | 'assistant' | 'audit' | 'edit' | 'team';
+type View = 'dashboard' | 'create' | 'detail' | 'settings' | 'shipment' | 'accounting' | 'calculator' | 'assistant' | 'audit' | 'edit' | 'team' | 'templates';
 type AuthScreen = 'welcome' | 'login' | 'register' | 'verify' | 'forgot';
 
 export default function App() {
@@ -210,6 +211,12 @@ export default function App() {
         return <AuditTrailView />;
       case 'team':
         return user.role === 'DIRECTOR' ? <TeamManagementView /> : (
+          <Dashboard onViewShipment={handleViewShipment} onCreateShipment={() => setCurrentView('create')} />
+        );
+      case 'templates':
+        return (user.role === 'DIRECTOR' || user.role === 'ACCOUNTANT') ? (
+          <TemplateDesignerView onBack={() => setCurrentView('settings')} />
+        ) : (
           <Dashboard onViewShipment={handleViewShipment} onCreateShipment={() => setCurrentView('create')} />
         );
       case 'settings':

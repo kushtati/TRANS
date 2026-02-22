@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import {
   User as UserIcon, Building2, Shield, Bell, LogOut,
   ChevronRight, Lock, Eye, EyeOff, Loader2,
-  AlertCircle, Moon,
+  AlertCircle, Moon, FileText,
 } from 'lucide-react';
 import type { User as UserType } from '../types';
 import { api, ApiError } from '../lib/api';
@@ -98,6 +98,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ user, onLogout, onNa
             label="Journal d'audit"
             sublabel="Historique des actions"
             onClick={() => onNavigate('audit')}
+          />
+        )}
+        {(user.role === 'DIRECTOR' || user.role === 'ACCOUNTANT') && onNavigate && (
+          <MenuItem
+            icon={<FileText size={20} className="text-amber-500" />}
+            label="Templates de facture"
+            sublabel="Designer PDF overlay"
+            onClick={() => onNavigate('templates')}
           />
         )}
       </div>

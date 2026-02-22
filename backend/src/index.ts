@@ -23,6 +23,7 @@ import uploadRoutes from './routes/upload.js';
 import invoiceRoutes from './routes/invoices.js';
 import teamRoutes from './routes/team.js';
 import ocrRoutes from './routes/ocr.js';
+import templateRoutes from './routes/templates.js';
 import { startCleanupScheduler } from './services/cleanup.service.js';
 
 const app = express();
@@ -136,6 +137,10 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/ocr', ocrRoutes);
+app.use('/api/templates', templateRoutes);
+
+// Serve template PDF files
+app.use('/uploads/templates', express.static('uploads/templates'));
 
 // ============================================
 // 404 handler

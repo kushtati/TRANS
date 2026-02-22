@@ -10,7 +10,7 @@ import {
 import { api } from '../../lib/api';
 import type { User, Role } from '../../types';
 
-type AppView = 'dashboard' | 'shipment' | 'create' | 'accounting' | 'calculator' | 'settings' | 'assistant' | 'detail' | 'audit' | 'edit' | 'team';
+type AppView = 'dashboard' | 'shipment' | 'create' | 'accounting' | 'calculator' | 'settings' | 'assistant' | 'detail' | 'audit' | 'edit' | 'team' | 'templates';
 
 interface AppLayoutProps {
   user: User;
