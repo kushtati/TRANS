@@ -52,6 +52,23 @@ interface FieldKeyCategory {
   keys: { key: string; label: string }[];
 }
 
+// Raw shape from the backend (flat array)
+interface RawFieldKey {
+  key: string;
+  label: string;
+  category: string;
+}
+
+/** Group flat field-key array into categories */
+function groupFieldKeys(raw: RawFieldKey[]): FieldKeyCategory[] {
+  const map = new Map<string, { key: string; label: string }[]>();
+  for (const item of raw) {
+    if (!map.has(item.category)) map.set(item.category, []);
+    map.get(item.category)!.push({ key: item.key, label: item.label });
+  }
+  return Array.from(map.entries()).map(([category, keys]) => ({ category, keys }));
+}
+
 // ===========================================================
 // Constants
 // ===========================================================
@@ -113,10 +130,10 @@ export const TemplateDesignerView: React.FC<{ onBack: () => void }> = ({ onBack 
       try {
         const [tRes, fRes] = await Promise.all([
           api.get<InvoiceTemplate[]>('/templates'),
-          api.get<FieldKeyCategory[]>('/templates/field-keys'),
+          api.get<RawFieldKey[]>('/templates/field-keys'),
         ]);
         setTemplates(tRes.data || []);
-        setFieldKeys(fRes.data || []);
+        setFieldKeys(groupFieldKeys(fRes.data || []));
       } catch (err: any) {
         setError(err.message || 'Erreur de chargement');
       } finally {
