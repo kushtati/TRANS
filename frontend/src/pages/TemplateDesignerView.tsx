@@ -381,7 +381,7 @@ export const TemplateDesignerView: React.FC<{ onBack: () => void }> = ({ onBack 
       });
 
       const json = await res.json();
-      if (!res.ok) throw new Error(json.message || 'Erreur OCR');
+      if (!res.ok) throw new Error(json.message || json.detail || 'Erreur OCR');
 
       const extracted: Record<string, string> = json.data || {};
       setOcrData(extracted);

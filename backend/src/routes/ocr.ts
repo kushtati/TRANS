@@ -23,6 +23,35 @@ import { prisma } from '../config/prisma.js';
 const router = Router();
 router.use(auth);
 
+/**
+ * Datalab page_schema returns { "0": { ... }, "1": { ... } }.
+ * Flatten into a single object by merging all pages (first non-empty value wins).
+ */
+function flattenPageData(raw: Record<string, any>): Record<string, any> {
+  const keys = Object.keys(raw);
+  if (
+    keys.length > 0 &&
+    keys.every(k => /^\d+$/.test(k)) &&
+    typeof raw[keys[0]] === 'object' &&
+    raw[keys[0]] !== null
+  ) {
+    const merged: Record<string, any> = {};
+    for (const pk of keys) {
+      const page = raw[pk];
+      if (page && typeof page === 'object') {
+        for (const [k, v] of Object.entries(page)) {
+          if (v !== undefined && v !== null && v !== '' && !merged[k]) {
+            merged[k] = v;
+          }
+        }
+      }
+    }
+    log.info('OCR: flattened per-page data', { pages: keys.length, mergedKeys: Object.keys(merged).length });
+    return merged;
+  }
+  return raw;
+}
+
 // ==========================================
 // Multer for temporary OCR uploads
 // ==========================================
@@ -292,7 +321,7 @@ router.post('/scan-to-invoice', (req: Request, res: Response) => {
       }
 
       // Step 2: Build invoice data from extracted data + company
-      const extractedData = ocrResult.extractedData || {};
+      const extractedData = flattenPageData(ocrResult.extractedData || {});
 
       // If no structured data, try to parse key info from markdown
       const invoiceData = buildInvoiceFromOcr(extractedData, company) as InvoiceData;
@@ -371,7 +400,7 @@ router.post('/scan-to-invoice-data', (req: Request, res: Response) => {
         });
       }
 
-      const extractedData = ocrResult.extractedData || {};
+      const extractedData = flattenPageData(ocrResult.extractedData || {});
       const invoiceData = buildInvoiceFromOcr(extractedData, company);
 
       log.audit('OCR scan-to-invoice-data complete', {
@@ -447,13 +476,17 @@ router.post('/scan-to-overlay', (req: Request, res: Response) => {
         });
       }
 
-      // Step 2: Build invoice data from OCR
-      const extractedData = ocrResult.extractedData || {};
+      // Step 2: Flatten per-page OCR data + build invoice data
+      const extractedData = flattenPageData(ocrResult.extractedData || {});
+      log.info('OCR scan-to-overlay: extractedData keys', { keys: Object.keys(extractedData) });
+
       const invoiceData = buildInvoiceFromOcr(extractedData, company);
 
       // Format number helper
-      const fmtN = (n: number): string =>
-        Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+      const fmtN = (n: number): string => {
+        const num = Number(n) || 0;
+        return Math.round(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+      };
 
       // Step 3: Map to overlay field keys (same keys as AVAILABLE_FIELD_KEYS)
       const nbContainers = Number(extractedData.container_count) || 1;
@@ -487,25 +520,33 @@ router.post('/scan-to-overlay', (req: Request, res: Response) => {
 
         // Lignes de débours
         line_droits_taxes: fmtN(
-          (invoiceData.lines || [])
-            .filter((l: any) => /droit|tax|douane/i.test(l.designation))
-            .reduce((s: number, l: any) => s + (l.montant || 0), 0)
+          Array.isArray(invoiceData.lines)
+            ? invoiceData.lines
+                .filter((l: any) => /droit|tax|douane/i.test(l.designation || ''))
+                .reduce((s: number, l: any) => s + (Number(l.montant) || 0), 0)
+            : 0
         ),
         line_bolore: fmtN(
-          (invoiceData.lines || [])
-            .filter((l: any) => /bolor|acconage|terminal|manutention/i.test(l.designation))
-            .reduce((s: number, l: any) => s + (l.montant || 0), 0)
+          Array.isArray(invoiceData.lines)
+            ? invoiceData.lines
+                .filter((l: any) => /bolor|acconage|terminal|manutention/i.test(l.designation || ''))
+                .reduce((s: number, l: any) => s + (Number(l.montant) || 0), 0)
+            : 0
         ),
         line_frais_circuit: fmtN(2_000_000 * nbContainers),
         line_armateur: fmtN(
-          (invoiceData.lines || [])
-            .filter((l: any) => /armateur|do.?fee|seaway|manifest/i.test(l.designation))
-            .reduce((s: number, l: any) => s + (l.montant || 0), 0)
+          Array.isArray(invoiceData.lines)
+            ? invoiceData.lines
+                .filter((l: any) => /armateur|do.?fee|seaway|manifest/i.test(l.designation || ''))
+                .reduce((s: number, l: any) => s + (Number(l.montant) || 0), 0)
+            : 0
         ),
         line_transports: fmtN(
-          (invoiceData.lines || [])
-            .filter((l: any) => /transport/i.test(l.designation))
-            .reduce((s: number, l: any) => s + (l.montant || 0), 0)
+          Array.isArray(invoiceData.lines)
+            ? invoiceData.lines
+                .filter((l: any) => /transport/i.test(l.designation || ''))
+                .reduce((s: number, l: any) => s + (Number(l.montant) || 0), 0)
+            : 0
         ),
         line_frais_declaration: fmtN(300_000 * nbContainers),
         line_frais_orange: fmtN(200_000 * nbContainers),
@@ -533,10 +574,15 @@ router.post('/scan-to-overlay', (req: Request, res: Response) => {
       });
     } catch (error: any) {
       if (req.file) fs.unlink(req.file.path, () => {});
-      log.error('OCR scan-to-overlay error', error);
+      log.error('OCR scan-to-overlay error', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+      });
       res.status(500).json({
         success: false,
         message: error.message || 'Erreur lors de l\'extraction OCR',
+        detail: error.stack?.split('\n').slice(0, 3).join(' | '),
       });
     }
   });
