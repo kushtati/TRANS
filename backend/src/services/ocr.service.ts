@@ -433,22 +433,28 @@ export function buildInvoiceFromOcr(
     bankAccount?: string | null;
   },
 ): Record<string, any> {
-  const nbContainers = extractedData.container_count || 1;
+  const nbContainers = Number(extractedData.container_count) || 1;
 
   // Fixed line names (lowercase for matching)
   const fixedNames = Object.keys(FIXED_LINES_PER_CONTAINER).map(n => n.toLowerCase());
 
+  // Ensure expense_lines is always an array
+  const rawLines = Array.isArray(extractedData.expense_lines)
+    ? extractedData.expense_lines
+    : [];
+
   // Variable expense lines from OCR (exclude lines that match fixed categories)
-  const variableLines = (extractedData.expense_lines || [])
+  const variableLines = rawLines
     .filter((line: any) => {
-      const name = (line.designation || '').toLowerCase();
+      if (!line || typeof line !== 'object') return false;
+      const name = String(line.designation || '').toLowerCase();
       return !fixedNames.some(f => name.includes(f));
     })
     .map((line: any) => ({
-      designation: line.designation || 'Frais',
+      designation: String(line.designation || 'Frais'),
       quantite: 1,
-      prixUnitaire: line.amount || 0,
-      montant: line.amount || 0,
+      prixUnitaire: Number(line.amount) || 0,
+      montant: Number(line.amount) || 0,
     }));
 
   // Fixed lines — montant fixe par conteneur
@@ -461,15 +467,16 @@ export function buildInvoiceFromOcr(
 
   const lines = [...variableLines, ...fixedLines];
 
-  const totalDebours = lines.reduce((s: number, l: any) => s + l.montant, 0);
+  const totalDebours = lines.reduce((s: number, l: any) => s + (Number(l.montant) || 0), 0);
   const prestation = FIXED_PRESTATION;
   const totalFacture = totalDebours + prestation;
-  const montantPaye = extractedData.montant_paye || 0;
+  const montantPaye = Number(extractedData.montant_paye) || 0;
   const resteAPayer = totalFacture - montantPaye;
 
-  // Container description
-  const containerType = extractedData.container_type || "40'";
-  const containerDesc = `${nbContainers}TC${containerType.replace(/[^0-9']/g, '')}' (${(extractedData.goods_description || 'MARCHANDISES').toUpperCase()})`;
+  // Container description (ensure string types)
+  const containerType = String(extractedData.container_type || "40'");
+  const goodsDesc = String(extractedData.goods_description || 'MARCHANDISES');
+  const containerDesc = `${nbContainers}TC${containerType.replace(/[^0-9']/g, '')}' (${goodsDesc.toUpperCase()})`;
 
   return {
     companyName: company.name,

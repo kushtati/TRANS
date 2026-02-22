@@ -39,19 +39,38 @@ app.use(helmet({
 }));
 
 // CORS
-const allowedOrigins = isProduction
-  ? [env.FRONTEND_URL, /\.vercel\.app$/, /\.railway\.app$/]
-  : [/localhost/, /127\.0\.0\.1/];
+const allowedOrigins: (string | RegExp)[] = [
+  // Always allow these in all environments
+  env.FRONTEND_URL,
+  /\.vercel\.app$/,
+  /\.railway\.app$/,
+];
+
+if (!isProduction) {
+  allowedOrigins.push(/localhost/, /127\.0\.0\.1/);
+}
+
+log.info('CORS config', {
+  isProduction,
+  NODE_ENV: env.NODE_ENV,
+  FRONTEND_URL: env.FRONTEND_URL,
+  originsCount: allowedOrigins.length,
+});
 
 app.use(cors({
   origin: (origin, callback) => {
+    // Allow requests with no origin (server-to-server, curl, mobile)
     if (!origin) return callback(null, true);
 
     const isAllowed = allowedOrigins.some(allowed =>
       allowed instanceof RegExp ? allowed.test(origin) : allowed === origin
     );
 
-    callback(null, isAllowed);
+    if (!isAllowed) {
+      log.warn('CORS blocked origin', { origin, allowedOrigins: allowedOrigins.map(String) });
+    }
+
+    callback(null, isAllowed || !isProduction);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
