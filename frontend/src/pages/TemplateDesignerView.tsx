@@ -11,7 +11,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   ArrowLeft, Upload, Save, Eye, Trash2, Plus, Loader2, FileText,
-  ChevronDown, ChevronRight, Type, Star, ScanLine,
+  ChevronDown, ChevronRight, Type, Star, Sparkles,
   Settings2, GripVertical, X, Check, AlertCircle,
   ZoomIn, ZoomOut, RotateCcw,
 } from 'lucide-react';
@@ -370,10 +370,9 @@ export const TemplateDesignerView: React.FC<{ onBack: () => void }> = ({ onBack 
     try {
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('mode', 'balanced');
 
       const token = getAccessToken();
-      const res = await fetch(`${API_BASE}/ocr/scan-to-overlay`, {
+      const res = await fetch(`${API_BASE}/ai/scan-to-overlay`, {
         method: 'POST',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         credentials: 'include',
@@ -417,9 +416,9 @@ export const TemplateDesignerView: React.FC<{ onBack: () => void }> = ({ onBack 
       });
 
       if (addedCount > 0) {
-        setError(`OCR: ${Object.keys(extracted).filter(k => extracted[k] && extracted[k] !== '0').length} champs remplis, ${addedCount} nouveaux ajoutés`);
+        setError(`IA: ${Object.keys(extracted).filter(k => extracted[k] && extracted[k] !== '0').length} champs remplis, ${addedCount} nouveaux ajoutés`);
       } else {
-        setError(`OCR: ${Object.keys(extracted).filter(k => extracted[k] && extracted[k] !== '0').length} champs remplis automatiquement`);
+        setError(`IA: ${Object.keys(extracted).filter(k => extracted[k] && extracted[k] !== '0').length} champs remplis automatiquement`);
       }
       setTimeout(() => setError(''), 4000);
     } catch (err: any) {
@@ -725,8 +724,8 @@ export const TemplateDesignerView: React.FC<{ onBack: () => void }> = ({ onBack 
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
             title="Scanner un document pour remplir les champs automatiquement"
           >
-            {scanning ? <Loader2 size={14} className="animate-spin" /> : <ScanLine size={14} />}
-            {scanning ? 'OCR...' : 'Scanner'}
+            {scanning ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+            {scanning ? 'IA...' : 'IA Scanner'}
           </button>
 
           {Object.keys(ocrData).length > 0 && (

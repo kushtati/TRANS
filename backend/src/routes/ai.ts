@@ -424,4 +424,225 @@ router.post('/extract-bl', blUpload.single('file'), async (req: Request, res: Re
   }
 });
 
+// ============================================
+// POST /api/ai/scan-to-overlay
+// Upload a document → Gemini AI → return data mapped to template overlay field keys
+// (used by the Template Designer to auto-fill field values)
+// ============================================
+
+const OVERLAY_EXTRACTION_PROMPT = `Tu es un expert en transit maritime et facturation en Guinée Conakry.
+Analyse ce document (facture de transit, facture proforma, note de débours, décompte) et extrais TOUTES les informations pour remplir une facture de transit.
+
+RETOURNE UNIQUEMENT un objet JSON valide, sans markdown, sans texte avant ou après.
+
+STRUCTURE JSON ATTENDUE (remplis TOUS les champs — si introuvable, utilise "" pour texte et 0 pour nombres) :
+{
+  "invoice_number": "numéro de facture",
+  "invoice_date": "date au format JJ/MM/AAAA",
+  "dossier_number": "numéro de dossier",
+  "client_name": "nom du client / destinataire / consignee",
+  "client_phone": "téléphone client",
+  "client_address": "adresse client",
+  "client_nif": "NIF du client",
+  "bl_number": "numéro de BL / connaissement",
+  "reference": "référence dossier",
+  "containers": "numéros conteneurs séparés par /",
+  "container_count": 0,
+  "container_description": "ex: 2TC40' (RIZ EN SACS)",
+  "description": "description de la marchandise",
+  "vessel_name": "nom du navire",
+  "line_droits_taxes": 0,
+  "line_bolore": 0,
+  "line_frais_circuit": 0,
+  "line_armateur": 0,
+  "line_transports": 0,
+  "line_frais_declaration": 0,
+  "line_frais_orange": 0,
+  "total_debours": 0,
+  "prestation": 0,
+  "total_facture": 0,
+  "montant_paye": 0,
+  "reste_a_payer": 0
+}
+
+RÈGLES :
+1. Les montants sont en GNF (Francs Guinéens). Pas de décimales, pas d'espaces dans les nombres JSON.
+2. line_droits_taxes = Droits et Taxes / Douane / DDI.
+3. line_bolore = Bolloré / Acconage / Terminal / Manutention / BSCA.
+4. line_frais_circuit = Frais de Circuit.
+5. line_armateur = Armateur / DO Fee / Seaway Bill / Manifest / BL Fee.
+6. line_transports = Transport / Camionnage / Livraison.
+7. line_frais_declaration = Frais de Déclaration / Honoraires déclarant.
+8. line_frais_orange = Orange Money / Frais mobile money.
+9. total_debours = somme de toutes les lignes de débours.
+10. prestation = honoraires / commission / prestation de service du transitaire.
+11. total_facture = total_debours + prestation.
+12. container_count = nombre de conteneurs (déduire si nécessaire).
+13. Si "Frais Circuit" n'est pas visible, calcule: 2 000 000 × container_count.
+14. Si "Frais Déclaration" n'est pas visible, calcule: 300 000 × container_count.
+15. Si "Frais Orange" n'est pas visible, calcule: 200 000 × container_count.
+
+Extrais le MAXIMUM. Mieux vaut deviner intelligemment que laisser vide.`;
+
+router.post('/scan-to-overlay', blUpload.single('file'), async (req: Request, res: Response) => {
+  try {
+    if (!model) {
+      return res.status(503).json({
+        success: false,
+        message: 'Service IA non configuré. Ajoutez GEMINI_API_KEY.',
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'Fichier requis' });
+    }
+
+    // Get company info
+    const company = await prisma.company.findUnique({
+      where: { id: req.user!.companyId },
+    });
+
+    if (!company) {
+      return res.status(404).json({ success: false, message: 'Entreprise non trouvée' });
+    }
+
+    const mimeType = req.file.mimetype;
+    const base64Data = req.file.buffer.toString('base64');
+    (req as any).file = null; // Free buffer
+
+    log.info('AI scan-to-overlay started', {
+      userId: req.user!.id,
+      mimeType,
+      size: req.file ? 0 : base64Data.length,
+    });
+
+    // Send to Gemini with timeout
+    const abortController = new AbortController();
+    const timeout = setTimeout(() => abortController.abort(), 45000);
+
+    let result;
+    try {
+      result = await model.generateContent({
+        contents: [{
+          role: 'user',
+          parts: [
+            { inlineData: { mimeType, data: base64Data } },
+            { text: OVERLAY_EXTRACTION_PROMPT },
+          ],
+        }],
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    const response = result.response;
+    if (!response.candidates || response.candidates.length === 0) {
+      return res.status(422).json({
+        success: false,
+        message: 'L\'IA n\'a pas pu analyser ce document.',
+      });
+    }
+
+    const responseText = response.text();
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+
+    if (!jsonMatch) {
+      return res.status(422).json({
+        success: false,
+        message: 'L\'IA n\'a pas retourné de données structurées.',
+        raw: responseText.substring(0, 500),
+      });
+    }
+
+    let extracted: Record<string, any>;
+    try {
+      extracted = JSON.parse(jsonMatch[0]);
+    } catch {
+      return res.status(422).json({
+        success: false,
+        message: 'Erreur de parsing JSON de l\'IA.',
+        raw: jsonMatch[0].substring(0, 500),
+      });
+    }
+
+    // Format number helper
+    const fmtN = (n: any): string => {
+      const num = Number(n) || 0;
+      return Math.round(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    };
+
+    // Compute fixed lines if not extracted
+    const nbContainers = Number(extracted.container_count) || 1;
+
+    // Build overlay data with all field keys
+    const overlayData: Record<string, string> = {
+      // Facture
+      invoice_number: String(extracted.invoice_number || ''),
+      invoice_date: String(extracted.invoice_date || ''),
+      dossier_number: String(extracted.dossier_number || extracted.reference || ''),
+
+      // Client
+      client_name: String(extracted.client_name || ''),
+      client_phone: String(extracted.client_phone || ''),
+      client_address: String(extracted.client_address || ''),
+      client_nif: String(extracted.client_nif || ''),
+
+      // Dossier
+      bl_number: String(extracted.bl_number || ''),
+      reference: String(extracted.reference || extracted.dossier_number || ''),
+      containers: String(extracted.containers || ''),
+      container_description: String(extracted.container_description || ''),
+      description: String(extracted.description || ''),
+      vessel_name: String(extracted.vessel_name || ''),
+
+      // Montants
+      total_debours: fmtN(extracted.total_debours),
+      prestation: fmtN(extracted.prestation),
+      total_facture: fmtN(extracted.total_facture),
+      montant_paye: fmtN(extracted.montant_paye),
+      reste_a_payer: fmtN(extracted.reste_a_payer),
+      total_lettres: '',
+
+      // Lignes
+      line_droits_taxes: fmtN(extracted.line_droits_taxes),
+      line_bolore: fmtN(extracted.line_bolore),
+      line_frais_circuit: fmtN(extracted.line_frais_circuit || 2_000_000 * nbContainers),
+      line_armateur: fmtN(extracted.line_armateur),
+      line_transports: fmtN(extracted.line_transports),
+      line_frais_declaration: fmtN(extracted.line_frais_declaration || 300_000 * nbContainers),
+      line_frais_orange: fmtN(extracted.line_frais_orange || 200_000 * nbContainers),
+
+      // Entreprise (from DB, not OCR)
+      company_name: company.name || '',
+      company_phone: company.phone || '',
+      company_address: company.address || '',
+      company_email: company.email || '',
+      company_rccm: company.rccm || '',
+      company_bank: company.bankName || '',
+    };
+
+    const filledCount = Object.keys(overlayData).filter(k => overlayData[k] && overlayData[k] !== '0').length;
+
+    log.audit('AI scan-to-overlay complete', {
+      userId: req.user!.id,
+      fieldsExtracted: filledCount,
+    });
+
+    res.json({
+      success: true,
+      data: overlayData,
+    });
+  } catch (error: any) {
+    const errMsg = error?.message || String(error);
+    log.error('AI scan-to-overlay error', { message: errMsg, stack: error?.stack });
+
+    let userMessage = 'Erreur lors de l\'extraction IA.';
+    if (errMsg.includes('API_KEY')) userMessage = 'Clé API Gemini invalide.';
+    else if (errMsg.includes('quota') || errMsg.includes('429')) userMessage = 'Limite IA atteinte. Réessayez dans 1 min.';
+    else if (errMsg.includes('abort') || errMsg.includes('timeout')) userMessage = 'L\'analyse a pris trop de temps.';
+
+    res.status(500).json({ success: false, message: userMessage });
+  }
+});
+
 export default router;
