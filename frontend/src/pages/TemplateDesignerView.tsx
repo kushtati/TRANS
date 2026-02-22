@@ -173,13 +173,21 @@ export const TemplateDesignerView: React.FC<{ onBack: () => void }> = ({ onBack 
         const canvas = pdfCanvasRef.current;
         if (!canvas) return;
 
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
+        // Render at high DPI for sharp display on retina screens
+        const dpr = window.devicePixelRatio || 1;
+        const hiResScale = Math.max(dpr, 2); // at least 2x
+        const scaledViewport = page.getViewport({ scale: hiResScale });
+
+        canvas.width = scaledViewport.width;
+        canvas.height = scaledViewport.height;
+        // CSS size stays at 1x (the parent div controls display size)
+        canvas.style.width = `${viewport.width}px`;
+        canvas.style.height = `${viewport.height}px`;
 
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        await page.render({ canvasContext: ctx, viewport, canvas } as any).promise;
+        await page.render({ canvasContext: ctx, viewport: scaledViewport, canvas } as any).promise;
       } catch (err) {
         console.error('PDF render error:', err);
       }
@@ -749,8 +757,8 @@ export const TemplateDesignerView: React.FC<{ onBack: () => void }> = ({ onBack 
             {/* PDF Background */}
             <canvas
               ref={pdfCanvasRef}
-              className="absolute inset-0 w-full h-full pointer-events-none"
-              style={{ imageRendering: 'auto' }}
+              className="absolute inset-0 pointer-events-none"
+              style={{ width: '100%', height: '100%' }}
             />
 
             {/* Field overlays */}
