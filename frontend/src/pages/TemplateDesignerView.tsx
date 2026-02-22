@@ -13,7 +13,7 @@ import {
   ArrowLeft, Upload, Save, Eye, Trash2, Plus, Loader2, FileText,
   ChevronDown, ChevronRight, Type, Star, Sparkles,
   Settings2, GripVertical, X, Check, AlertCircle,
-  ZoomIn, ZoomOut, RotateCcw,
+  ZoomIn, ZoomOut, RotateCcw, Wand2,
 } from 'lucide-react';
 import { api, getAccessToken } from '../lib/api';
 
@@ -109,6 +109,7 @@ export const TemplateDesignerView: React.FC<{ onBack: () => void }> = ({ onBack 
   // --- State: OCR auto-fill ---
   const [ocrData, setOcrData] = useState<Record<string, string>>({});
   const [scanning, setScanning] = useState(false);
+  const [positioning, setPositioning] = useState(false);
 
   // --- State: UI ---
   const [loading, setLoading] = useState(true);
@@ -430,6 +431,65 @@ export const TemplateDesignerView: React.FC<{ onBack: () => void }> = ({ onBack 
   };
 
   // ===========================================================
+  // AI Auto-Position — sends template PDF to Gemini for layout analysis
+  // ===========================================================
+
+  const handleAutoPosition = async () => {
+    if (!selectedTemplate) {
+      setError('Sélectionnez d\'abord un template.');
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
+
+    setPositioning(true);
+    setError('');
+
+    try {
+      const token = getAccessToken();
+
+      // Send templateId — backend will read the stored PDF
+      const res = await fetch(`${API_BASE}/ai/auto-position-fields`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        credentials: 'include',
+        body: JSON.stringify({ templateId: selectedTemplate.id }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || 'Erreur IA positionnement');
+
+      const positioned: TemplateField[] = (json.data || []).map((f: any) => ({
+        fieldKey: f.fieldKey,
+        label: f.label,
+        posX: f.posX,
+        posY: f.posY,
+        fontSize: f.fontSize,
+        fontFamily: f.fontFamily,
+        fontWeight: f.fontWeight,
+        textAlign: f.textAlign,
+        color: f.color,
+        maxWidth: f.maxWidth,
+      }));
+
+      if (positioned.length === 0) {
+        throw new Error('L\'IA n\'a détecté aucun champ.');
+      }
+
+      setFields(positioned);
+      setSelectedFieldIdx(null);
+      setError(`IA: ${positioned.length} champs positionnés automatiquement ✓`);
+      setTimeout(() => setError(''), 4000);
+    } catch (err: any) {
+      setError(err.message || 'Erreur IA positionnement');
+    } finally {
+      setPositioning(false);
+    }
+  };
+
+  // ===========================================================
   // Add a field to the canvas
   // ===========================================================
 
@@ -737,6 +797,17 @@ export const TemplateDesignerView: React.FC<{ onBack: () => void }> = ({ onBack 
               <X size={12} /> OCR
             </button>
           )}
+
+          {/* AI Auto-Position button */}
+          <button
+            onClick={handleAutoPosition}
+            disabled={positioning || !selectedTemplate}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors disabled:opacity-50"
+            title="L'IA positionne automatiquement tous les champs sur le template"
+          >
+            {positioning ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
+            {positioning ? 'Analyse...' : 'IA Positionner'}
+          </button>
 
           <button onClick={() => setShowFieldPanel(p => !p)}
             className="p-2 hover:bg-stone-100 rounded-lg transition-colors" title="Panneau champs">

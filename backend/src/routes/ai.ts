@@ -645,4 +645,209 @@ router.post('/scan-to-overlay', blUpload.single('file'), async (req: Request, re
   }
 });
 
+// ============================================
+// POST /api/ai/auto-position-fields
+// Upload template PDF → Gemini analyzes layout → returns exact field positions
+// ============================================
+
+const AUTO_POSITION_PROMPT = `Tu es un expert en mise en page PDF et en transit maritime en Guinée Conakry.
+On te donne un PDF de facture de transit vierge (template). Tu dois analyser le layout et déterminer les coordonnées EXACTES en points PDF où chaque champ dynamique doit être placé pour que le texte s'aligne parfaitement avec le design existant.
+
+SYSTÈME DE COORDONNÉES PDF :
+- Origine (0, 0) = coin BAS-GAUCHE de la page
+- X augmente vers la DROITE
+- Y augmente vers le HAUT
+- Page A4 = 595.28 × 841.89 points
+- 1 point PDF = 1/72 pouce
+
+CHAMPS À POSITIONNER (fieldKey → description) :
+- invoice_number : Numéro de facture (ex: "217") — généralement en gras, grande police, centre-droit
+- invoice_date : Date (ex: "05/02/2026") — en haut à droite, après "Conakry, le"
+- dossier_number : N° Dossier — en-tête gauche
+- client_name : Nom du client — à droite, sous le numéro de facture
+- client_phone : Téléphone client — à droite, sous le nom du client
+- bl_number : N° BL — en-tête gauche
+- reference : Référence — en-tête gauche
+- containers : N° conteneurs — en-tête gauche
+- container_description : Description conteneurs (ex: "2TC40' (PILON)") — en-tête gauche
+- description : Marchandise — en-tête gauche, après "dédouanement de"
+- vessel_name : Nom navire — en-tête gauche si visible
+- line_droits_taxes : Montant droits et taxes — colonne MONTANT GNF, ligne correspondante
+- line_bolore : Montant Bolloré — colonne MONTANT GNF
+- line_frais_circuit : Montant frais circuit — colonne MONTANT GNF
+- line_armateur : Montant armateur/CMA — colonne MONTANT GNF
+- line_transports : Montant transports — colonne MONTANT GNF
+- line_frais_declaration : Montant frais déclaration — colonne MONTANT GNF
+- line_frais_orange : Montant frais Orange Money — colonne MONTANT GNF
+- total_debours : Total débours — en gras, colonne MONTANT
+- prestation : Prestation — colonne MONTANT
+- total_facture : Total facture — en gras, colonne MONTANT
+- total_lettres : Montant en toutes lettres — centré, sous le tableau
+- montant_paye : Montant payé par le client — en gras, sous le total en lettres
+- reste_a_payer : Reste à payer — en gras, sous le montant payé
+
+RETOURNE UNIQUEMENT un tableau JSON valide, sans markdown, sans texte avant ou après.
+Chaque élément du tableau :
+{
+  "fieldKey": "invoice_number",
+  "label": "N° Facture",
+  "posX": 350,
+  "posY": 720,
+  "fontSize": 14,
+  "fontFamily": "Helvetica",
+  "fontWeight": "bold",
+  "textAlign": "left",
+  "color": "#000000",
+  "maxWidth": null
+}
+
+RÈGLES CRITIQUES :
+1. Mesure les positions EN POINTS PDF depuis le coin BAS-GAUCHE.
+2. fontSize doit correspondre à la taille visible dans le document (6-32 pts).
+3. fontWeight: "bold" pour les titres, totaux, labels. "normal" pour les valeurs courantes.
+4. textAlign: "right" pour les montants numériques dans la colonne MONTANT GNF. "left" pour les textes.
+5. color: "#000000" noir par défaut. Si un champ utilise du bleu, utilise la couleur exacte hex.
+6. maxWidth: donner une largeur en points pour les champs qui peuvent déborder (ex: total_lettres → 450, container_description → 250).
+7. Les montants (line_*) doivent tous avoir le MÊME posX et être alignés à droite dans la colonne "MONTANT GNF".
+8. Sois TRÈS PRÉCIS sur les positions Y — chaque ligne du tableau a un espacement régulier.
+9. Pour les champs de l'en-tête : place-les exactement là où les VALEURS apparaissent (pas les labels).
+10. N'inclus que les champs dynamiques. Les labels fixes (DESIGNATION, QUANTITE, etc.) font partie du PDF template.
+11. fontFamily: "Helvetica" sauf si tu détectes une autre police.
+12. N'invente PAS de champs qui ne sont pas dans la liste ci-dessus.
+
+Analyse le PDF attentivement et retourne le JSON.`;
+
+router.post('/auto-position-fields', blUpload.single('file'), async (req: Request, res: Response) => {
+  try {
+    if (!model) {
+      return res.status(503).json({
+        success: false,
+        message: 'Service IA non configuré. Ajoutez GEMINI_API_KEY.',
+      });
+    }
+
+    // Accept either an uploaded file or a templateId to fetch from DB
+    let base64Data: string;
+    let mimeType = 'application/pdf';
+
+    if (req.file) {
+      base64Data = req.file.buffer.toString('base64');
+      mimeType = req.file.mimetype;
+      (req as any).file = null;
+    } else if (req.body.templateId) {
+      // Fetch template PDF from disk
+      const template = await prisma.invoiceTemplate.findFirst({
+        where: { id: req.body.templateId, companyId: req.user!.companyId },
+      });
+      if (!template) {
+        return res.status(404).json({ success: false, message: 'Template non trouvé' });
+      }
+
+      const TEMPLATE_DIR = path.resolve(process.cwd(), 'uploads', 'templates');
+      const fileName = template.fileUrl.split('/').pop()!;
+      const filePath = path.join(TEMPLATE_DIR, fileName);
+
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ success: false, message: 'Fichier PDF du template introuvable' });
+      }
+
+      base64Data = fs.readFileSync(filePath).toString('base64');
+    } else {
+      return res.status(400).json({ success: false, message: 'Fichier ou templateId requis' });
+    }
+
+    log.info('AI auto-position-fields started', { userId: req.user!.id });
+
+    // Send to Gemini
+    const abortController = new AbortController();
+    const timeout = setTimeout(() => abortController.abort(), 60000);
+
+    let result;
+    try {
+      result = await model.generateContent({
+        contents: [{
+          role: 'user',
+          parts: [
+            { inlineData: { mimeType, data: base64Data } },
+            { text: AUTO_POSITION_PROMPT },
+          ],
+        }],
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    const response = result.response;
+    if (!response.candidates || response.candidates.length === 0) {
+      return res.status(422).json({
+        success: false,
+        message: 'L\'IA n\'a pas pu analyser le template.',
+      });
+    }
+
+    const responseText = response.text();
+
+    // Parse JSON array from response
+    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      return res.status(422).json({
+        success: false,
+        message: 'L\'IA n\'a pas retourné de positions structurées.',
+        raw: responseText.substring(0, 1000),
+      });
+    }
+
+    let fields: any[];
+    try {
+      fields = JSON.parse(jsonMatch[0]);
+    } catch {
+      return res.status(422).json({
+        success: false,
+        message: 'Erreur de parsing JSON.',
+        raw: jsonMatch[0].substring(0, 1000),
+      });
+    }
+
+    // Validate and sanitize each field
+    const validFamilies = ['Helvetica', 'Courier', 'TimesRoman'];
+    const validAligns = ['left', 'center', 'right'];
+    const validWeights = ['normal', 'bold'];
+
+    const sanitized = fields
+      .filter((f: any) => f && f.fieldKey && typeof f.posX === 'number' && typeof f.posY === 'number')
+      .map((f: any) => ({
+        fieldKey: String(f.fieldKey),
+        label: String(f.label || f.fieldKey),
+        posX: Math.max(0, Math.min(600, Number(f.posX) || 0)),
+        posY: Math.max(0, Math.min(850, Number(f.posY) || 0)),
+        fontSize: Math.max(4, Math.min(72, Number(f.fontSize) || 10)),
+        fontFamily: validFamilies.includes(f.fontFamily) ? f.fontFamily : 'Helvetica',
+        fontWeight: validWeights.includes(f.fontWeight) ? f.fontWeight : 'normal',
+        textAlign: validAligns.includes(f.textAlign) ? f.textAlign : 'left',
+        color: /^#[0-9A-Fa-f]{6}$/.test(f.color) ? f.color : '#000000',
+        maxWidth: typeof f.maxWidth === 'number' ? f.maxWidth : null,
+      }));
+
+    log.audit('AI auto-position-fields complete', {
+      userId: req.user!.id,
+      fieldsCount: sanitized.length,
+    });
+
+    res.json({
+      success: true,
+      data: sanitized,
+    });
+  } catch (error: any) {
+    const errMsg = error?.message || String(error);
+    log.error('AI auto-position-fields error', { message: errMsg, stack: error?.stack });
+
+    let userMessage = 'Erreur lors de l\'analyse IA du template.';
+    if (errMsg.includes('API_KEY')) userMessage = 'Clé API Gemini invalide.';
+    else if (errMsg.includes('quota') || errMsg.includes('429')) userMessage = 'Limite IA atteinte.';
+    else if (errMsg.includes('abort') || errMsg.includes('timeout')) userMessage = 'L\'analyse a pris trop de temps.';
+
+    res.status(500).json({ success: false, message: userMessage });
+  }
+});
+
 export default router;
