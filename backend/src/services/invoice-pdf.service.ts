@@ -510,16 +510,25 @@ interface CompanyForInvoice {
   bankAccount?: string | null;
 }
 
-// Group categories into invoice line groupings
+// Fixed amounts per container (in GNF) — always shown on every invoice
+export const FIXED_LINES_PER_CONTAINER: Record<string, number> = {
+  'FRAIS CIRCUIT': 2_000_000,
+  'FRAIS DE DECLARATION': 300_000,
+  'FRAIS ORANGE MONEY': 200_000,
+};
+
+export const FIXED_PRESTATION = 1_500_000;
+
+// Group categories into invoice line groupings (variable amounts from actual expenses)
 const INVOICE_LINE_GROUPS: Record<string, string[]> = {
   'Droits et Taxes': ['DD', 'TVA', 'RTL', 'PC', 'CA', 'BFU', 'DDI_FEE'],
   'BOLORE': ['ACCONAGE', 'BRANCHEMENT', 'SURESTARIES', 'MANUTENTION', 'PASSAGE_TERRE', 'RELEVAGE', 'SECURITE_TERMINAL'],
-  'FRAIS CIRCUIT': ['SCANNER'],
   'ARMATEUR': ['DO_FEE', 'SEAWAY_BILL', 'MANIFEST_FEE', 'CONTAINER_DAMAGE', 'SECURITE_MSC', 'SURCHARGE', 'PAC', 'ADP_FEE'],
   'TRANSPORTS': ['TRANSPORT', 'TRANSPORT_ADD'],
-  'FRAIS DE DECLARATION': ['HONORAIRES', 'COMMISSION'],
-  'FRAIS ORANGE MONEY': ['AUTRE'],
 };
+
+// Categories covered by fixed lines (excluded from variable grouping)
+const FIXED_CATEGORIES = ['SCANNER', 'HONORAIRES', 'COMMISSION', 'AUTRE'];
 
 export function buildInvoiceData(
   shipment: ShipmentForInvoice,
@@ -528,9 +537,9 @@ export function buildInvoiceData(
   montantPayeClient: number,
 ): InvoiceData {
   const disbursements = shipment.expenses.filter(e => e.type === 'DISBURSEMENT');
-  const provisions = shipment.expenses.filter(e => e.type === 'PROVISION');
+  const nbContainers = shipment.containers.length || 1;
 
-  // Group expenses into invoice lines
+  // Variable expense lines (grouped from actual expenses)
   const lines: InvoiceLineData[] = [];
   for (const [groupName, categories] of Object.entries(INVOICE_LINE_GROUPS)) {
     const groupExpenses = disbursements.filter(e => categories.includes(e.category));
@@ -545,8 +554,8 @@ export function buildInvoiceData(
     }
   }
 
-  // Catch any uncategorized disbursements
-  const allGroupedCategories = Object.values(INVOICE_LINE_GROUPS).flat();
+  // Catch any uncategorized disbursements (excluding fixed categories)
+  const allGroupedCategories = [...Object.values(INVOICE_LINE_GROUPS).flat(), ...FIXED_CATEGORIES];
   const uncategorized = disbursements.filter(e => !allGroupedCategories.includes(e.category));
   for (const e of uncategorized) {
     lines.push({
@@ -557,21 +566,23 @@ export function buildInvoiceData(
     });
   }
 
-  const totalDebours = disbursements.reduce((s, e) => s + e.amount, 0);
-  // Prestation = Honoraires group total, or default 1,500,000
-  const honorairesExpenses = disbursements.filter(e => ['HONORAIRES', 'COMMISSION'].includes(e.category));
-  const prestation = honorairesExpenses.length > 0 ? honorairesExpenses.reduce((s, e) => s + e.amount, 0) : 1_500_000;
+  // Fixed lines — montant fixe par conteneur
+  for (const [designation, unitAmount] of Object.entries(FIXED_LINES_PER_CONTAINER)) {
+    lines.push({
+      designation,
+      quantite: nbContainers,
+      prixUnitaire: unitAmount,
+      montant: unitAmount * nbContainers,
+    });
+  }
 
-  // Remove FRAIS DE DECLARATION from lines since we show it as PRESTATION separately
-  const filteredLines = lines.filter(l => l.designation !== 'FRAIS DE DECLARATION');
-  const totalDeboursWithoutHonoraires = totalDebours - prestation;
-
-  const totalFacture = totalDeboursWithoutHonoraires + prestation;
+  const totalDebours = lines.reduce((s, l) => s + l.montant, 0);
+  const prestation = FIXED_PRESTATION;
+  const totalFacture = totalDebours + prestation;
   const resteAPayer = totalFacture - montantPayeClient;
 
   // Build container description
   const containerNums = shipment.containers.map(c => c.number).join(' / ');
-  const nbContainers = shipment.containers.length || 1;
   const containerType = shipment.containers[0]?.type?.includes('40') ? "40'" : "20'";
   const containerDesc = `${nbContainers}TC${containerType} (${shipment.description.toUpperCase()})`;
 
@@ -598,8 +609,8 @@ export function buildInvoiceData(
     clientName: shipment.clientName,
     clientPhone: shipment.clientPhone || '-',
 
-    lines: filteredLines,
-    totalDebours: totalDeboursWithoutHonoraires,
+    lines,
+    totalDebours,
     prestation,
     totalFacture,
     montantPayeClient,

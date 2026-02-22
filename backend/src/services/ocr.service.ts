@@ -4,6 +4,7 @@
 
 import { env } from '../config/env.js';
 import { log } from '../config/logger.js';
+import { FIXED_LINES_PER_CONTAINER, FIXED_PRESTATION } from './invoice-pdf.service.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -83,6 +84,36 @@ export const INVOICE_SCHEMA = {
   },
 };
 
+/** Schema for transit invoice extraction (to regenerate as EMERGENCE-style invoice) */
+export const TRANSIT_INVOICE_SCHEMA = {
+  invoice_number: { type: 'string', description: 'Invoice or reference number' },
+  invoice_date: { type: 'string', description: 'Invoice date (dd/mm/yyyy format)' },
+  client_name: { type: 'string', description: 'Client / customer / consignee name' },
+  client_phone: { type: 'string', description: 'Client phone number' },
+  bl_number: { type: 'string', description: 'Bill of Lading number' },
+  reference: { type: 'string', description: 'Reference or dossier number' },
+  containers: { type: 'string', description: 'Container numbers separated by / if multiple' },
+  container_count: { type: 'number', description: 'Number of containers' },
+  container_type: { type: 'string', description: 'Container type (20GP, 40HC, etc.)' },
+  goods_description: { type: 'string', description: 'Description of goods / merchandise' },
+  expense_lines: {
+    type: 'array',
+    description: 'All expense/cost lines found in the document',
+    items: {
+      type: 'object',
+      properties: {
+        designation: { type: 'string', description: 'Name/label of the expense line (e.g., Droits et Taxes, BOLORE, FRAIS CIRCUIT, ARMATEUR, TRANSPORTS, etc.)' },
+        amount: { type: 'number', description: 'Amount in GNF (Guinean Francs)' },
+      },
+    },
+  },
+  total_debours: { type: 'number', description: 'Total disbursements / debours in GNF' },
+  prestation: { type: 'number', description: 'Service fee / prestation / honoraires in GNF' },
+  total_facture: { type: 'number', description: 'Total invoice amount in GNF' },
+  montant_paye: { type: 'number', description: 'Amount paid by client in GNF' },
+  reste_a_payer: { type: 'number', description: 'Remaining amount to pay in GNF' },
+};
+
 // ==========================================
 // Types
 // ==========================================
@@ -107,7 +138,7 @@ export interface OcrResult {
   error?: string;
 }
 
-export type DocumentType = 'bl' | 'invoice' | 'general';
+export type DocumentType = 'bl' | 'invoice' | 'transit_invoice' | 'general';
 
 // ==========================================
 // Core API Functions
@@ -153,6 +184,8 @@ export async function submitDocument(
   // Structured extraction schema based on document type
   if (documentType === 'bl') {
     formData.append('page_schema', JSON.stringify(BL_SCHEMA));
+  } else if (documentType === 'transit_invoice') {
+    formData.append('page_schema', JSON.stringify(TRANSIT_INVOICE_SCHEMA));
   } else if (documentType === 'invoice') {
     formData.append('page_schema', JSON.stringify(INVOICE_SCHEMA));
   }
@@ -223,6 +256,8 @@ export async function submitDocumentUrl(
     formData.append('page_schema', JSON.stringify(BL_SCHEMA));
   } else if (documentType === 'invoice') {
     formData.append('page_schema', JSON.stringify(INVOICE_SCHEMA));
+  } else if (documentType === 'transit_invoice') {
+    formData.append('page_schema', JSON.stringify(TRANSIT_INVOICE_SCHEMA));
   }
 
   const response = await fetch(`${DATALAB_BASE}/marker`, {
@@ -381,6 +416,92 @@ export function mapInvoiceToFields(extractedData: Record<string, any>): Record<s
 // ==========================================
 // Utilities
 // ==========================================
+
+/**
+ * Build InvoiceData from OCR-extracted transit invoice data + company info
+ */
+export function buildInvoiceFromOcr(
+  extractedData: Record<string, any>,
+  company: {
+    name: string;
+    phone?: string | null;
+    address?: string | null;
+    email?: string | null;
+    rccm?: string | null;
+    agrementNumber?: string | null;
+    bankName?: string | null;
+    bankAccount?: string | null;
+  },
+): Record<string, any> {
+  const nbContainers = extractedData.container_count || 1;
+
+  // Fixed line names (lowercase for matching)
+  const fixedNames = Object.keys(FIXED_LINES_PER_CONTAINER).map(n => n.toLowerCase());
+
+  // Variable expense lines from OCR (exclude lines that match fixed categories)
+  const variableLines = (extractedData.expense_lines || [])
+    .filter((line: any) => {
+      const name = (line.designation || '').toLowerCase();
+      return !fixedNames.some(f => name.includes(f));
+    })
+    .map((line: any) => ({
+      designation: line.designation || 'Frais',
+      quantite: 1,
+      prixUnitaire: line.amount || 0,
+      montant: line.amount || 0,
+    }));
+
+  // Fixed lines — montant fixe par conteneur
+  const fixedLines = Object.entries(FIXED_LINES_PER_CONTAINER).map(([designation, unitAmount]) => ({
+    designation,
+    quantite: nbContainers,
+    prixUnitaire: unitAmount,
+    montant: unitAmount * nbContainers,
+  }));
+
+  const lines = [...variableLines, ...fixedLines];
+
+  const totalDebours = lines.reduce((s: number, l: any) => s + l.montant, 0);
+  const prestation = FIXED_PRESTATION;
+  const totalFacture = totalDebours + prestation;
+  const montantPaye = extractedData.montant_paye || 0;
+  const resteAPayer = totalFacture - montantPaye;
+
+  // Container description
+  const containerType = extractedData.container_type || "40'";
+  const containerDesc = `${nbContainers}TC${containerType.replace(/[^0-9']/g, '')}' (${(extractedData.goods_description || 'MARCHANDISES').toUpperCase()})`;
+
+  return {
+    companyName: company.name,
+    companySlogan: 'Disponibilite - Efficacite - Transparence',
+    companyAddress: company.address || 'Almamya, Conakry',
+    companyEmail: company.email || undefined,
+    companyPhone: company.phone || undefined,
+    companyRccm: company.rccm || undefined,
+    companyAgrementNumber: company.agrementNumber || undefined,
+    companyBankName: company.bankName || undefined,
+    companyBankAccount: company.bankAccount || undefined,
+
+    invoiceNumber: extractedData.invoice_number || `FAC-${Date.now().toString().slice(-6)}`,
+    invoiceDate: extractedData.invoice_date || new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+    dossierNumber: extractedData.reference || '-',
+
+    blNumber: extractedData.bl_number || '-',
+    reference: extractedData.reference || '-',
+    containers: extractedData.containers || '-',
+    containerDescription: containerDesc,
+
+    clientName: extractedData.client_name || 'Client',
+    clientPhone: extractedData.client_phone || '-',
+
+    lines,
+    totalDebours,
+    prestation,
+    totalFacture,
+    montantPayeClient: montantPaye,
+    resteAPayer,
+  };
+}
 
 function getMimeType(filename: string): string {
   const ext = path.extname(filename).toLowerCase();

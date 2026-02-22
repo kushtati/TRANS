@@ -1,8 +1,8 @@
 // src/components/ShipmentDetail/ShipmentFinance.tsx
 
-import React, { useState, useMemo } from 'react';
-import { Plus, Wallet, CheckCircle2, Clock, Loader2, X, AlertCircle, AlertTriangle, Trash2, Zap, Download, CreditCard } from 'lucide-react';
-import { api, ApiError } from '../../lib/api';
+import React, { useState, useMemo, useRef } from 'react';
+import { Plus, Wallet, CheckCircle2, Clock, Loader2, X, AlertCircle, AlertTriangle, Trash2, Zap, Download, CreditCard, ScanLine } from 'lucide-react';
+import { api, ApiError, getAccessToken } from '../../lib/api';
 import type { Shipment, ExpenseType, ExpenseCategory } from '../../types';
 
 interface ShipmentFinanceProps {
@@ -301,6 +301,52 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
     api.downloadFile(`/export/shipment/${shipment.id}/facture`, `facture-${shipment.trackingNumber || shipment.id}.pdf`);
   };
 
+  // === OCR Scan-to-Invoice ===
+  const [isScanning, setIsScanning] = useState(false);
+  const scanInputRef = useRef<HTMLInputElement>(null);
+
+  const handleScanToInvoice = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Reset input so same file can be re-selected
+    if (scanInputRef.current) scanInputRef.current.value = '';
+
+    setIsScanning(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const headers: Record<string, string> = {};
+      const token = getAccessToken();
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/ocr/scan-to-invoice`,
+        { method: 'POST', headers, body: formData, credentials: 'include' }
+      );
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Erreur OCR');
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `facture-scan-${shipment.trackingNumber || shipment.id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Scan-to-invoice error:', err);
+      alert(err instanceof Error ? err.message : 'Erreur lors du scan');
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
   const provisions = shipment.expenses?.filter(e => e.type === 'PROVISION') || [];
   const disbursements = shipment.expenses?.filter(e => e.type === 'DISBURSEMENT') || [];
 
@@ -372,6 +418,23 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
             Télécharger la facture
           </button>
         )}
+
+        {/* OCR Scan-to-Invoice */}
+        <input
+          ref={scanInputRef}
+          type="file"
+          accept=".pdf,.jpg,.jpeg,.png,.webp,.tiff,.gif"
+          onChange={handleScanToInvoice}
+          className="hidden"
+        />
+        <button
+          onClick={() => scanInputRef.current?.click()}
+          disabled={isScanning}
+          className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors shadow-sm"
+        >
+          {isScanning ? <Loader2 size={16} className="animate-spin" /> : <ScanLine size={16} />}
+          {isScanning ? 'Scan en cours...' : 'Scanner une facture'}
+        </button>
 
         <div className="flex-1" />
 

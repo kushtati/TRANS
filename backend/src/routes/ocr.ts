@@ -14,8 +14,11 @@ import {
   extractDocument,
   mapBlToShipmentFields,
   mapInvoiceToFields,
+  buildInvoiceFromOcr,
   DocumentType,
 } from '../services/ocr.service.js';
+import { generateInvoicePDF, InvoiceData } from '../services/invoice-pdf.service.js';
+import { prisma } from '../config/prisma.js';
 
 const router = Router();
 router.use(auth);
@@ -232,6 +235,163 @@ router.post('/extract-sync', (req: Request, res: Response) => {
       res.status(500).json({
         success: false,
         message: error.message || 'Erreur lors de l\'extraction OCR',
+      });
+    }
+  });
+});
+
+// ==========================================
+// POST /api/ocr/scan-to-invoice
+// Upload a document → OCR → generate EMERGENCE-style invoice PDF
+// ==========================================
+
+router.post('/scan-to-invoice', (req: Request, res: Response) => {
+  ocrUpload.single('file')(req, res, async (err) => {
+    if (err) {
+      return res.status(400).json({
+        success: false,
+        message: err instanceof multer.MulterError
+          ? `Erreur upload : ${err.message}`
+          : err.message,
+      });
+    }
+
+    try {
+      if (!req.file) {
+        return res.status(400).json({ success: false, message: 'Fichier requis' });
+      }
+
+      // Get company info
+      const company = await prisma.company.findUnique({
+        where: { id: req.user!.companyId },
+      });
+
+      if (!company) {
+        fs.unlink(req.file.path, () => {});
+        return res.status(404).json({ success: false, message: 'Entreprise non trouvee' });
+      }
+
+      const mode = (req.body.mode || 'balanced') as 'fast' | 'balanced' | 'accurate';
+
+      // Step 1: OCR extract with transit invoice schema
+      log.info('OCR scan-to-invoice: extracting document', { fileName: req.file.originalname });
+      const ocrResult = await extractDocument(req.file.path, {
+        documentType: 'transit_invoice',
+        mode,
+      });
+
+      // Clean up temp file
+      fs.unlink(req.file.path, () => {});
+
+      if (!ocrResult.success || ocrResult.status === 'failed') {
+        return res.status(422).json({
+          success: false,
+          message: ocrResult.error || 'Echec de l\'extraction OCR',
+          markdown: ocrResult.markdown, // Still return raw text for debugging
+        });
+      }
+
+      // Step 2: Build invoice data from extracted data + company
+      const extractedData = ocrResult.extractedData || {};
+
+      // If no structured data, try to parse key info from markdown
+      const invoiceData = buildInvoiceFromOcr(extractedData, company) as InvoiceData;
+
+      // Step 3: Generate EMERGENCE-style PDF
+      const pdfBytes = await generateInvoicePDF(invoiceData);
+
+      log.audit('OCR scan-to-invoice complete', {
+        userId: req.user!.id,
+        fileName: req.file.originalname,
+        invoiceNumber: invoiceData.invoiceNumber,
+        totalFacture: invoiceData.totalFacture,
+      });
+
+      // Return the PDF
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=facture-${invoiceData.invoiceNumber}.pdf`);
+      res.setHeader('Content-Length', pdfBytes.length.toString());
+      res.end(Buffer.from(pdfBytes));
+    } catch (error: any) {
+      if (req.file) fs.unlink(req.file.path, () => {});
+      log.error('OCR scan-to-invoice error', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Erreur lors de la generation de facture',
+      });
+    }
+  });
+});
+
+// ==========================================
+// POST /api/ocr/scan-to-invoice-data
+// Same as above but returns JSON data instead of PDF
+// (for preview / editing before PDF generation)
+// ==========================================
+
+router.post('/scan-to-invoice-data', (req: Request, res: Response) => {
+  ocrUpload.single('file')(req, res, async (err) => {
+    if (err) {
+      return res.status(400).json({
+        success: false,
+        message: err instanceof multer.MulterError
+          ? `Erreur upload : ${err.message}`
+          : err.message,
+      });
+    }
+
+    try {
+      if (!req.file) {
+        return res.status(400).json({ success: false, message: 'Fichier requis' });
+      }
+
+      const company = await prisma.company.findUnique({
+        where: { id: req.user!.companyId },
+      });
+
+      if (!company) {
+        fs.unlink(req.file.path, () => {});
+        return res.status(404).json({ success: false, message: 'Entreprise non trouvee' });
+      }
+
+      const mode = (req.body.mode || 'balanced') as 'fast' | 'balanced' | 'accurate';
+
+      const ocrResult = await extractDocument(req.file.path, {
+        documentType: 'transit_invoice',
+        mode,
+      });
+
+      fs.unlink(req.file.path, () => {});
+
+      if (!ocrResult.success || ocrResult.status === 'failed') {
+        return res.status(422).json({
+          success: false,
+          message: ocrResult.error || 'Echec de l\'extraction OCR',
+          markdown: ocrResult.markdown,
+        });
+      }
+
+      const extractedData = ocrResult.extractedData || {};
+      const invoiceData = buildInvoiceFromOcr(extractedData, company);
+
+      log.audit('OCR scan-to-invoice-data complete', {
+        userId: req.user!.id,
+        fileName: req.file.originalname,
+      });
+
+      res.json({
+        success: true,
+        ocrRaw: ocrResult.extractedData,
+        invoiceData,
+        markdown: ocrResult.markdown,
+        pageCount: ocrResult.pageCount,
+      });
+    } catch (error: any) {
+      if (req.file) fs.unlink(req.file.path, () => {});
+      log.error('OCR scan-to-invoice-data error', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Erreur lors de l\'extraction',
       });
     }
   });
