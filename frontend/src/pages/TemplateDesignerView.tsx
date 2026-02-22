@@ -157,12 +157,15 @@ export const TemplateDesignerView: React.FC<{ onBack: () => void }> = ({ onBack 
         // Set worker — use jsdelivr CDN which mirrors every npm package
         pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
-        // Build full URL for the PDF
-        const pdfUrl = selectedTemplate.fileUrl.startsWith('http')
-          ? selectedTemplate.fileUrl
-          : `${API_BASE.replace('/api', '')}${selectedTemplate.fileUrl}`;
+        // Fetch PDF via authenticated API route (avoids static file 404 on Railway)
+        const token = getAccessToken();
+        const pdfUrl = `${API_BASE}/templates/${selectedTemplate.id}/pdf`;
 
-        const loadingTask = pdfjsLib.getDocument(pdfUrl);
+        const loadingTask = pdfjsLib.getDocument({
+          url: pdfUrl,
+          httpHeaders: token ? { Authorization: `Bearer ${token}` } : {},
+          withCredentials: true,
+        });
         const pdf = await loadingTask.promise;
         const page = await pdf.getPage(1);
 

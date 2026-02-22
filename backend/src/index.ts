@@ -139,9 +139,6 @@ app.use('/api/team', teamRoutes);
 app.use('/api/ocr', ocrRoutes);
 app.use('/api/templates', templateRoutes);
 
-// Serve template PDF files
-app.use('/uploads/templates', express.static('uploads/templates'));
-
 // ============================================
 // 404 handler
 // ============================================

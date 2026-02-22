@@ -75,6 +75,34 @@ router.get('/field-keys', (_req: Request, res: Response) => {
 });
 
 // ==========================================
+// GET /api/templates/:id/pdf
+// Serve the template PDF file (avoids static file issues on ephemeral FS)
+// ==========================================
+
+router.get('/:id/pdf', async (req: Request, res: Response) => {
+  try {
+    const template = await prisma.invoiceTemplate.findFirst({
+      where: { id: req.params.id, companyId: req.user!.companyId },
+    });
+    if (!template) {
+      return res.status(404).json({ success: false, message: 'Template non trouvé' });
+    }
+
+    const filePath = path.resolve(process.cwd(), template.fileUrl.replace(/^\//, ''));
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, message: 'Fichier template introuvable sur le serveur' });
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    fs.createReadStream(filePath).pipe(res);
+  } catch (error: any) {
+    log.error('Serve template PDF error', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ==========================================
 // GET /api/templates
 // List templates for the user's company
 // ==========================================
