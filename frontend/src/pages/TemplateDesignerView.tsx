@@ -154,9 +154,8 @@ export const TemplateDesignerView: React.FC<{ onBack: () => void }> = ({ onBack 
       try {
         const pdfjsLib = await import('pdfjs-dist');
         
-        // Set worker — use Vite ?url import to get a bundled URL for the worker
-        const workerUrl = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url);
-        pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl.href;
+        // Set worker — use jsdelivr CDN which mirrors every npm package
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
         // Build full URL for the PDF
         const pdfUrl = selectedTemplate.fileUrl.startsWith('http')
