@@ -11,7 +11,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   ArrowLeft, Upload, Save, Eye, Trash2, Plus, Loader2, FileText,
-  ChevronDown, ChevronRight, Type, Star,
+  ChevronDown, ChevronRight, Type, Star, ScanLine,
   Settings2, GripVertical, X, Check, AlertCircle,
   ZoomIn, ZoomOut, RotateCcw,
 } from 'lucide-react';
@@ -106,6 +106,10 @@ export const TemplateDesignerView: React.FC<{ onBack: () => void }> = ({ onBack 
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
 
+  // --- State: OCR auto-fill ---
+  const [ocrData, setOcrData] = useState<Record<string, string>>({});
+  const [scanning, setScanning] = useState(false);
+
   // --- State: UI ---
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -119,6 +123,7 @@ export const TemplateDesignerView: React.FC<{ onBack: () => void }> = ({ onBack 
   // --- Refs ---
   const canvasRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const ocrInputRef = useRef<HTMLInputElement>(null);
   const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
 
   // ===========================================================
@@ -348,6 +353,80 @@ export const TemplateDesignerView: React.FC<{ onBack: () => void }> = ({ onBack 
       );
     } catch (err: any) {
       setError(err.message);
+    }
+  };
+
+  // ===========================================================
+  // OCR Scan — upload document, extract data, auto-fill fields
+  // ===========================================================
+
+  const handleOcrScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setScanning(true);
+    setError('');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('mode', 'balanced');
+
+      const token = getAccessToken();
+      const res = await fetch(`${API_BASE}/ocr/scan-to-overlay`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: 'include',
+        body: formData,
+      });
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || 'Erreur OCR');
+
+      const extracted: Record<string, string> = json.data || {};
+      setOcrData(extracted);
+
+      // Auto-add fields that were extracted but not yet on the canvas
+      const extractedKeys = Object.entries(extracted)
+        .filter(([_, val]) => val && val !== '' && val !== '0')
+        .map(([key]) => key);
+
+      // Find labels from fieldKeys
+      const allKeys = fieldKeys.flatMap(cat => cat.keys);
+      let addedCount = 0;
+
+      setFields(prev => {
+        const existing = new Set(prev.map(f => f.fieldKey));
+        const toAdd: TemplateField[] = [];
+
+        for (const fk of extractedKeys) {
+          if (existing.has(fk)) continue;
+          const meta = allKeys.find(k => k.key === fk);
+          if (!meta) continue;
+
+          toAdd.push({
+            ...DEFAULT_FIELD,
+            fieldKey: fk,
+            label: meta.label,
+            posY: DEFAULT_FIELD.posY - (prev.length + toAdd.length) * 20,
+          });
+          addedCount++;
+        }
+
+        return [...prev, ...toAdd];
+      });
+
+      if (addedCount > 0) {
+        setError(`OCR: ${Object.keys(extracted).filter(k => extracted[k] && extracted[k] !== '0').length} champs remplis, ${addedCount} nouveaux ajoutés`);
+      } else {
+        setError(`OCR: ${Object.keys(extracted).filter(k => extracted[k] && extracted[k] !== '0').length} champs remplis automatiquement`);
+      }
+      setTimeout(() => setError(''), 4000);
+    } catch (err: any) {
+      setError(err.message || 'Erreur OCR');
+    } finally {
+      setScanning(false);
+      if (ocrInputRef.current) ocrInputRef.current.value = '';
     }
   };
 
@@ -638,6 +717,28 @@ export const TemplateDesignerView: React.FC<{ onBack: () => void }> = ({ onBack 
             </button>
           </div>
 
+          {/* OCR Scan button */}
+          <input ref={ocrInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={handleOcrScan} className="hidden" />
+          <button
+            onClick={() => ocrInputRef.current?.click()}
+            disabled={scanning}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
+            title="Scanner un document pour remplir les champs automatiquement"
+          >
+            {scanning ? <Loader2 size={14} className="animate-spin" /> : <ScanLine size={14} />}
+            {scanning ? 'OCR...' : 'Scanner'}
+          </button>
+
+          {Object.keys(ocrData).length > 0 && (
+            <button
+              onClick={() => setOcrData({})}
+              className="flex items-center gap-1 px-2 py-1.5 text-xs text-stone-500 hover:text-red-500 transition-colors"
+              title="Effacer les données OCR"
+            >
+              <X size={12} /> OCR
+            </button>
+          )}
+
           <button onClick={() => setShowFieldPanel(p => !p)}
             className="p-2 hover:bg-stone-100 rounded-lg transition-colors" title="Panneau champs">
             <Settings2 size={16} />
@@ -804,9 +905,9 @@ export const TemplateDesignerView: React.FC<{ onBack: () => void }> = ({ onBack 
                     {field.label}
                   </span>
 
-                  {/* Field preview text */}
+                  {/* Field preview text — show OCR data if available */}
                   <span style={{ fontSize: field.fontSize * zoom }}>
-                    {`{${field.fieldKey}}`}
+                    {ocrData[field.fieldKey] || `{${field.fieldKey}}`}
                   </span>
                 </div>
               );

@@ -397,4 +397,149 @@ router.post('/scan-to-invoice-data', (req: Request, res: Response) => {
   });
 });
 
+// ==========================================
+// POST /api/ocr/scan-to-overlay
+// Upload a document → OCR → return data mapped to template overlay field keys
+// (used by the Template Designer to auto-fill field values)
+// ==========================================
+
+router.post('/scan-to-overlay', (req: Request, res: Response) => {
+  ocrUpload.single('file')(req, res, async (err) => {
+    if (err) {
+      return res.status(400).json({
+        success: false,
+        message: err instanceof multer.MulterError
+          ? `Erreur upload : ${err.message}`
+          : err.message,
+      });
+    }
+
+    try {
+      if (!req.file) {
+        return res.status(400).json({ success: false, message: 'Fichier requis' });
+      }
+
+      const company = await prisma.company.findUnique({
+        where: { id: req.user!.companyId },
+      });
+
+      if (!company) {
+        fs.unlink(req.file.path, () => {});
+        return res.status(404).json({ success: false, message: 'Entreprise non trouvée' });
+      }
+
+      const mode = (req.body.mode || 'balanced') as 'fast' | 'balanced' | 'accurate';
+
+      // Step 1: OCR extract
+      log.info('OCR scan-to-overlay: extracting document', { fileName: req.file.originalname });
+      const ocrResult = await extractDocument(req.file.path, {
+        documentType: 'transit_invoice',
+        mode,
+      });
+
+      fs.unlink(req.file.path, () => {});
+
+      if (!ocrResult.success || ocrResult.status === 'failed') {
+        return res.status(422).json({
+          success: false,
+          message: ocrResult.error || 'Échec de l\'extraction OCR',
+          markdown: ocrResult.markdown,
+        });
+      }
+
+      // Step 2: Build invoice data from OCR
+      const extractedData = ocrResult.extractedData || {};
+      const invoiceData = buildInvoiceFromOcr(extractedData, company);
+
+      // Format number helper
+      const fmtN = (n: number): string =>
+        Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+
+      // Step 3: Map to overlay field keys (same keys as AVAILABLE_FIELD_KEYS)
+      const nbContainers = Number(extractedData.container_count) || 1;
+      const overlayData: Record<string, string> = {
+        // Facture
+        invoice_number: invoiceData.invoiceNumber || '',
+        invoice_date: invoiceData.invoiceDate || '',
+        dossier_number: invoiceData.dossierNumber || '',
+
+        // Client
+        client_name: invoiceData.clientName || '',
+        client_phone: invoiceData.clientPhone || '',
+        client_address: String(extractedData.client_address || ''),
+        client_nif: String(extractedData.client_nif || ''),
+
+        // Dossier
+        bl_number: invoiceData.blNumber || '',
+        reference: invoiceData.reference || '',
+        containers: invoiceData.containers || '',
+        container_description: invoiceData.containerDescription || '',
+        description: String(extractedData.goods_description || ''),
+        vessel_name: String(extractedData.vessel_name || ''),
+
+        // Montants
+        total_debours: fmtN(invoiceData.totalDebours || 0),
+        prestation: fmtN(invoiceData.prestation || 0),
+        total_facture: fmtN(invoiceData.totalFacture || 0),
+        montant_paye: fmtN(invoiceData.montantPayeClient || 0),
+        reste_a_payer: fmtN(invoiceData.resteAPayer || 0),
+        total_lettres: '', // Could add French words conversion
+
+        // Lignes de débours
+        line_droits_taxes: fmtN(
+          (invoiceData.lines || [])
+            .filter((l: any) => /droit|tax|douane/i.test(l.designation))
+            .reduce((s: number, l: any) => s + (l.montant || 0), 0)
+        ),
+        line_bolore: fmtN(
+          (invoiceData.lines || [])
+            .filter((l: any) => /bolor|acconage|terminal|manutention/i.test(l.designation))
+            .reduce((s: number, l: any) => s + (l.montant || 0), 0)
+        ),
+        line_frais_circuit: fmtN(2_000_000 * nbContainers),
+        line_armateur: fmtN(
+          (invoiceData.lines || [])
+            .filter((l: any) => /armateur|do.?fee|seaway|manifest/i.test(l.designation))
+            .reduce((s: number, l: any) => s + (l.montant || 0), 0)
+        ),
+        line_transports: fmtN(
+          (invoiceData.lines || [])
+            .filter((l: any) => /transport/i.test(l.designation))
+            .reduce((s: number, l: any) => s + (l.montant || 0), 0)
+        ),
+        line_frais_declaration: fmtN(300_000 * nbContainers),
+        line_frais_orange: fmtN(200_000 * nbContainers),
+
+        // Entreprise
+        company_name: company.name || '',
+        company_phone: company.phone || '',
+        company_address: company.address || '',
+        company_email: company.email || '',
+        company_rccm: company.rccm || '',
+        company_bank: company.bankName || '',
+      };
+
+      log.audit('OCR scan-to-overlay complete', {
+        userId: req.user!.id,
+        fileName: req.file.originalname,
+        fieldsExtracted: Object.keys(overlayData).filter(k => overlayData[k] && overlayData[k] !== '0').length,
+      });
+
+      res.json({
+        success: true,
+        data: overlayData,
+        ocrRaw: ocrResult.extractedData,
+        markdown: ocrResult.markdown,
+      });
+    } catch (error: any) {
+      if (req.file) fs.unlink(req.file.path, () => {});
+      log.error('OCR scan-to-overlay error', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Erreur lors de l\'extraction OCR',
+      });
+    }
+  });
+});
+
 export default router;
