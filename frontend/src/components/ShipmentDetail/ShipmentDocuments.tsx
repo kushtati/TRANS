@@ -1,7 +1,7 @@
 // src/components/ShipmentDetail/ShipmentDocuments.tsx
 
 import React, { useState, useRef } from 'react';
-import { Plus, FileText, Download, Trash2, Eye, Loader2, X, AlertCircle, Upload, Link2 } from 'lucide-react';
+import { Plus, FileText, Download, Trash2, Eye, Loader2, X, AlertCircle, Upload, Link2, Sparkles } from 'lucide-react';
 import { api, ApiError, getAccessToken } from '../../lib/api';
 import type { Shipment, DocumentType } from '../../types';
 
@@ -78,6 +78,7 @@ export const ShipmentDocuments: React.FC<ShipmentDocumentsProps> = ({ shipment, 
   const [uploadMode, setUploadMode] = useState<'file' | 'url'>('file');
   const [autoAdvanceMsg, setAutoAdvanceMsg] = useState('');
   const [fieldHintMsg, setFieldHintMsg] = useState('');
+  const [extractionMsg, setExtractionMsg] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const formatStatus = (s: string) => {
@@ -167,6 +168,7 @@ export const ShipmentDocuments: React.FC<ShipmentDocumentsProps> = ({ shipment, 
       const res = await api.post<{
         document: any;
         statusAdvanced?: { advanced: boolean; newStatus?: string; oldStatus?: string };
+        extraction?: { updatedFields: string[]; updatedLabels: string[]; message: string } | null;
         fieldHints?: { fields: string[]; label: string } | null;
       }>(`/shipments/${shipment.id}/documents`, {
         type: newDoc.type,
@@ -185,8 +187,12 @@ export const ShipmentDocuments: React.FC<ShipmentDocumentsProps> = ({ shipment, 
         setTimeout(() => setAutoAdvanceMsg(''), 5000);
       }
 
-      // Show field hints if document type has extractable fields
-      if (res.data?.fieldHints) {
+      // Show AI extraction result
+      if (res.data?.extraction && res.data.extraction.updatedFields.length > 0) {
+        setExtractionMsg(`🤖 ${res.data.extraction.message}`);
+        setTimeout(() => setExtractionMsg(''), 10000);
+      } else if (res.data?.fieldHints) {
+        // Fallback: hint which fields the user should fill manually
         setFieldHintMsg(`💡 Document "${res.data.fieldHints.label}" ajouté. Pensez à remplir : ${res.data.fieldHints.fields.slice(0, 4).join(', ')}...`);
         setTimeout(() => setFieldHintMsg(''), 8000);
       }
@@ -227,6 +233,14 @@ export const ShipmentDocuments: React.FC<ShipmentDocumentsProps> = ({ shipment, 
       {autoAdvanceMsg && (
         <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800 font-medium animate-fade-in">
           {autoAdvanceMsg}
+        </div>
+      )}
+
+      {/* AI extraction notification */}
+      {extractionMsg && (
+        <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl text-sm text-purple-800 animate-fade-in flex items-start gap-2">
+          <Sparkles size={18} className="text-purple-500 flex-shrink-0 mt-0.5" />
+          <span>{extractionMsg}</span>
         </div>
       )}
 
@@ -458,7 +472,7 @@ export const ShipmentDocuments: React.FC<ShipmentDocumentsProps> = ({ shipment, 
                 className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-medium disabled:opacity-60 flex items-center justify-center gap-2"
               >
                 {isAdding && <Loader2 size={18} className="animate-spin" />}
-                {isUploading ? 'Téléchargement...' : 'Ajouter'}
+                {isUploading ? 'Téléchargement...' : isAdding ? 'Analyse IA...' : 'Ajouter'}
               </button>
             </div>
           </div>

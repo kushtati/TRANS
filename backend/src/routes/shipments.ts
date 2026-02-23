@@ -7,6 +7,7 @@ import { prisma } from '../config/prisma.js';
 import { log } from '../config/logger.js';
 import { auth, requireRole } from '../middleware/auth.js';
 import { autoAdvanceStatus, generateAlerts, getNextSteps, DOCUMENT_FIELD_HINTS } from '../services/workflow.service.js';
+import { extractAndUpdateShipment } from '../services/document-extract.service.js';
 import {
   createShipmentSchema,
   updateShipmentSchema,
@@ -646,14 +647,28 @@ router.post('/:id/documents', async (req: Request, res: Response) => {
       },
     });
 
+    // Auto-advance status
+    const statusAdvanced = await autoAdvanceStatus(shipment.id, data.type, req.user!.id);
+
+    // AI auto-extract fields from the uploaded document
+    let extraction = null;
+    if (data.url) {
+      extraction = await extractAndUpdateShipment(shipment.id, data.type, data.url);
+    }
+
     res.status(201).json({
       success: true,
       data: {
         document,
-        // Auto-advance status if this document triggers a progression
-        statusAdvanced: await autoAdvanceStatus(shipment.id, data.type, req.user!.id),
-        // Hint which fields the user should fill from this document
-        fieldHints: DOCUMENT_FIELD_HINTS[data.type] || null,
+        statusAdvanced,
+        // AI extraction result (null if not available or failed)
+        extraction: extraction ? {
+          updatedFields: extraction.updatedFields,
+          updatedLabels: extraction.updatedLabels,
+          message: extraction.message,
+        } : null,
+        // Fallback: hint which fields the user should fill manually
+        fieldHints: !extraction?.updatedFields?.length ? (DOCUMENT_FIELD_HINTS[data.type] || null) : null,
       },
     });
   } catch (error) {
