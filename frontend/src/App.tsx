@@ -30,6 +30,7 @@ const AuditTrailView = lazy(() => import('./pages/AuditTrailView').then(m => ({ 
 const EditShipmentView = lazy(() => import('./pages/EditShipmentView').then(m => ({ default: m.EditShipmentView })));
 const TeamManagementView = lazy(() => import('./pages/TeamManagementView').then(m => ({ default: m.TeamManagementView })));
 const TemplateDesignerView = lazy(() => import('./pages/TemplateDesignerView').then(m => ({ default: m.TemplateDesignerView })));
+const CategoryDetailView = lazy(() => import('./pages/CategoryDetailView').then(m => ({ default: m.CategoryDetailView })));
 
 const ViewLoader = () => (
   <div className="flex items-center justify-center min-h-[300px]">
@@ -37,7 +38,7 @@ const ViewLoader = () => (
   </div>
 );
 
-type View = 'dashboard' | 'create' | 'detail' | 'settings' | 'shipment' | 'accounting' | 'calculator' | 'assistant' | 'audit' | 'edit' | 'team' | 'templates';
+type View = 'dashboard' | 'create' | 'detail' | 'settings' | 'shipment' | 'accounting' | 'calculator' | 'assistant' | 'audit' | 'edit' | 'team' | 'templates' | 'category';
 type AuthScreen = 'welcome' | 'login' | 'register' | 'verify' | 'forgot';
 
 export default function App() {
@@ -50,6 +51,7 @@ export default function App() {
   const [pendingEmail, setPendingEmail] = useState('');
   const [registerStep, setRegisterStep] = useState<1 | 2>(1);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
 
   const handleLogout = useCallback(async () => {
     await logout();
@@ -66,6 +68,11 @@ export default function App() {
   const handleEditShipment = useCallback((id: string) => {
     setSelectedShipmentId(id);
     setCurrentView('edit');
+  }, []);
+
+  const handleOpenCategory = useCallback((cat: string) => {
+    setSelectedCategory(cat);
+    setCurrentView('category');
   }, []);
 
   const handleAuthSuccess = useCallback((userData: User) => {
@@ -159,7 +166,16 @@ export default function App() {
           <Dashboard
             onViewShipment={handleViewShipment}
             onCreateShipment={() => setCurrentView('create')}
+            onOpenCategory={handleOpenCategory}
             searchQuery={searchQuery}
+          />
+        );
+      case 'category':
+        return (
+          <CategoryDetailView
+            category={selectedCategory as 'pending' | 'inProgress' | 'delivered' | 'finance'}
+            onBack={() => setCurrentView('dashboard')}
+            onViewShipment={handleViewShipment}
           />
         );
       case 'create':
@@ -169,6 +185,7 @@ export default function App() {
             <Dashboard
               onViewShipment={handleViewShipment}
               onCreateShipment={() => setCurrentView('create')}
+              onOpenCategory={handleOpenCategory}
               searchQuery={searchQuery}
             />
           );
@@ -211,13 +228,13 @@ export default function App() {
         return <AuditTrailView />;
       case 'team':
         return user.role === 'DIRECTOR' ? <TeamManagementView /> : (
-          <Dashboard onViewShipment={handleViewShipment} onCreateShipment={() => setCurrentView('create')} />
+          <Dashboard onViewShipment={handleViewShipment} onCreateShipment={() => setCurrentView('create')} onOpenCategory={handleOpenCategory} />
         );
       case 'templates':
         return (user.role === 'DIRECTOR' || user.role === 'ACCOUNTANT') ? (
           <TemplateDesignerView onBack={() => setCurrentView('settings')} />
         ) : (
-          <Dashboard onViewShipment={handleViewShipment} onCreateShipment={() => setCurrentView('create')} />
+          <Dashboard onViewShipment={handleViewShipment} onCreateShipment={() => setCurrentView('create')} onOpenCategory={handleOpenCategory} />
         );
       case 'settings':
         return (
@@ -232,6 +249,7 @@ export default function App() {
           <Dashboard
             onViewShipment={handleViewShipment}
             onCreateShipment={() => setCurrentView('create')}
+            onOpenCategory={handleOpenCategory}
           />
         );
     }
