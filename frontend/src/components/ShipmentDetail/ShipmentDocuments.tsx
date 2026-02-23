@@ -34,6 +34,17 @@ const documentTypeLabels: Record<DocumentType, string> = {
   OTHER: 'Autre',
 };
 
+const documentTypeGroups: Record<string, DocumentType[]> = {
+  'Transport maritime': ['BL', 'PACKING_LIST'],
+  'Commercial': ['INVOICE', 'EUR1', 'ORIGIN_CERT', 'PHYTO_CERT'],
+  'Transit': ['TRANSIT_ORDER', 'DDI'],
+  'Douane': ['DECLARATION', 'LIQUIDATION', 'QUITTANCE', 'BAE', 'CUSTOMS_INVOICE'],
+  'Terminal': ['TERMINAL_INVOICE', 'TERMINAL_RECEIPT', 'EIR'],
+  'Armateur': ['DO', 'MSC_INVOICE'],
+  'Livraison': ['EXIT_NOTE', 'DELIVERY_NOTE'],
+  'Autre': ['OTHER'],
+};
+
 const documentTypeColors: Record<string, string> = {
   BL: 'bg-blue-100 text-blue-700',
   INVOICE: 'bg-green-100 text-green-700',
@@ -326,8 +337,12 @@ export const ShipmentDocuments: React.FC<ShipmentDocumentsProps> = ({ shipment, 
                   onChange={(e) => setNewDoc(prev => ({ ...prev, type: e.target.value as DocumentType }))}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2.5"
                 >
-                  {Object.entries(documentTypeLabels).map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
+                  {Object.entries(documentTypeGroups).map(([group, types]) => (
+                    <optgroup key={group} label={group}>
+                      {types.map(t => (
+                        <option key={t} value={t}>{documentTypeLabels[t]}</option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
               </div>
