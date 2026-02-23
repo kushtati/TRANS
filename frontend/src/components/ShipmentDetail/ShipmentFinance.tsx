@@ -64,6 +64,7 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
   const [prefillItems, setPrefillItems] = useState<Array<{ category: ExpenseCategory; description: string; amount: number; reference: string; selected: boolean }>>([]);
   const [isPayingAll, setIsPayingAll] = useState(false);
   const [showPayAllConfirm, setShowPayAllConfirm] = useState(false);
+  const [statusAdvanceMsg, setStatusAdvanceMsg] = useState('');
 
   const [newExpense, setNewExpense] = useState({
     type: 'DISBURSEMENT' as ExpenseType,
@@ -263,7 +264,12 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
   const handleMarkPaid = async (expenseId: string) => {
     setPayingId(expenseId);
     try {
-      await api.post(`/finance/expenses/${expenseId}/pay`);
+      const res = await api.post<{ expense: any; statusAdvanced?: { advanced: boolean; newStatus?: string } }>(`/finance/expenses/${expenseId}/pay`);
+      if (res.data?.statusAdvanced?.advanced) {
+        const label = res.data.statusAdvanced.newStatus === 'TERMINAL_PAID' ? 'Terminal payé' : res.data.statusAdvanced.newStatus;
+        setStatusAdvanceMsg(`✅ Statut avancé automatiquement → ${label}`);
+        setTimeout(() => setStatusAdvanceMsg(''), 5000);
+      }
       onRefresh();
     } catch (err) {
       console.error(err);
@@ -288,7 +294,12 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
     setIsPayingAll(true);
     setShowPayAllConfirm(false);
     try {
-      await api.post('/finance/expenses/pay-all', { shipmentId: shipment.id });
+      const res = await api.post<{ paidCount: number; totalPaid: number; statusAdvanced?: { advanced: boolean; newStatus?: string } }>('/finance/expenses/pay-all', { shipmentId: shipment.id });
+      if (res.data?.statusAdvanced?.advanced) {
+        const label = res.data.statusAdvanced.newStatus === 'TERMINAL_PAID' ? 'Terminal payé' : res.data.statusAdvanced.newStatus;
+        setStatusAdvanceMsg(`✅ Statut avancé automatiquement → ${label}`);
+        setTimeout(() => setStatusAdvanceMsg(''), 5000);
+      }
       onRefresh();
     } catch (err) {
       console.error(err);
@@ -366,6 +377,13 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
 
   return (
     <div className="space-y-4">
+      {/* Status advance notification */}
+      {statusAdvanceMsg && (
+        <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800 font-medium animate-fade-in">
+          {statusAdvanceMsg}
+        </div>
+      )}
+
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <SummaryCard label="Provisions" amount={totalProvisions} color="green" />

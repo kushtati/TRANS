@@ -6,6 +6,7 @@ import { prisma } from '../config/prisma.js';
 import { log } from '../config/logger.js';
 import { auth, requireRole } from '../middleware/auth.js';
 import { createExpenseSchema, updateExpenseSchema } from '../validators/finance.validators.js';
+import { autoAdvanceOnExpensePaid } from '../services/workflow.service.js';
 
 const router = Router();
 
@@ -305,9 +306,12 @@ router.post('/expenses/:id/pay', async (req: Request, res: Response) => {
       shipment: expense.shipment.trackingNumber,
     });
 
+    // Auto-advance status if terminal expense paid
+    const statusAdvanced = await autoAdvanceOnExpensePaid(expense.shipmentId, expense.category, req.user!.id);
+
     res.json({
       success: true,
-      data: { expense: updated },
+      data: { expense: updated, statusAdvanced },
     });
   } catch (error) {
     log.error('Pay expense error', error);
@@ -392,9 +396,17 @@ router.post('/expenses/pay-all', async (req: Request, res: Response) => {
       shipment: shipment.trackingNumber,
     });
 
+    // Auto-advance status if any terminal expense was in the batch
+    const terminalCats = ['ACCONAGE', 'BRANCHEMENT', 'SURESTARIES', 'MANUTENTION', 'PASSAGE_TERRE', 'RELEVAGE', 'SECURITE_TERMINAL'];
+    const hasTerminal = unpaid.some(e => terminalCats.includes(e.category));
+    let statusAdvanced = { advanced: false } as { advanced: boolean; newStatus?: string; oldStatus?: string };
+    if (hasTerminal) {
+      statusAdvanced = await autoAdvanceOnExpensePaid(shipmentId, 'ACCONAGE', req.user!.id);
+    }
+
     res.json({
       success: true,
-      data: { paidCount: unpaid.length, totalPaid: Math.round(totalPaid) },
+      data: { paidCount: unpaid.length, totalPaid: Math.round(totalPaid), statusAdvanced },
     });
   } catch (error) {
     log.error('Bulk pay error', error);

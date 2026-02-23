@@ -95,6 +95,64 @@ export async function autoAdvanceStatus(
 }
 
 // ============================================
+// 1b. EXPENSE PAID → STATUS AUTO-PROGRESSION
+// When terminal-category expenses are paid, auto-advance BAE_ISSUED → TERMINAL_PAID
+// ============================================
+
+const TERMINAL_CATEGORIES = [
+  'ACCONAGE', 'BRANCHEMENT', 'SURESTARIES', 'MANUTENTION',
+  'PASSAGE_TERRE', 'RELEVAGE', 'SECURITE_TERMINAL',
+];
+
+/**
+ * After an expense is paid, check if we should auto-advance.
+ * Currently: if status is BAE_ISSUED and a terminal-category expense was paid → TERMINAL_PAID
+ */
+export async function autoAdvanceOnExpensePaid(
+  shipmentId: string,
+  expenseCategory: string,
+  userId: string
+): Promise<{ advanced: boolean; newStatus?: string; oldStatus?: string }> {
+  try {
+    // Only react to terminal-category expenses
+    if (!TERMINAL_CATEGORIES.includes(expenseCategory)) return { advanced: false };
+
+    const shipment = await prisma.shipment.findUnique({
+      where: { id: shipmentId },
+      select: { status: true, trackingNumber: true },
+    });
+
+    if (!shipment || shipment.status !== 'BAE_ISSUED') return { advanced: false };
+
+    const userName = (await prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true },
+    }))?.name;
+
+    await prisma.shipment.update({
+      where: { id: shipmentId },
+      data: { status: 'TERMINAL_PAID' as ShipmentStatus },
+    });
+
+    await prisma.timelineEvent.create({
+      data: {
+        shipmentId,
+        action: 'Statut avancé automatiquement → TERMINAL_PAID',
+        description: `Frais terminal payés. Passage de BAE_ISSUED à TERMINAL_PAID.`,
+        userId,
+        userName,
+      },
+    });
+
+    log.info(`Auto-advanced ${shipment.trackingNumber}: BAE_ISSUED → TERMINAL_PAID (expense paid)`);
+    return { advanced: true, newStatus: 'TERMINAL_PAID', oldStatus: 'BAE_ISSUED' };
+  } catch (error) {
+    log.error('Auto-advance on expense paid failed', error);
+    return { advanced: false };
+  }
+}
+
+// ============================================
 // 2. DOCUMENT → FIELD AUTO-FILL MAPPING
 // Returns which shipment fields should be extracted from a document type
 // ============================================
@@ -402,6 +460,9 @@ export function getNextSteps(shipment: {
 
     case 'BAE_ISSUED':
       steps.push({ label: 'Payer les frais terminal', action: 'pay_expenses', priority: 'high' });
+      if (!docTypes.includes('TERMINAL_INVOICE') && !docTypes.includes('TERMINAL_RECEIPT')) {
+        steps.push({ label: 'Ajouter la facture/reçu terminal', action: 'add_document', priority: 'medium', documentNeeded: 'TERMINAL_INVOICE' });
+      }
       break;
 
     case 'TERMINAL_PAID':
