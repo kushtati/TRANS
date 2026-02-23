@@ -1,7 +1,7 @@
 // src/components/ShipmentDetail/ShipmentFinance.tsx
 
 import React, { useState, useMemo, useRef } from 'react';
-import { Plus, Wallet, CheckCircle2, Clock, Loader2, X, AlertCircle, AlertTriangle, Trash2, Zap, Download, CreditCard, ScanLine } from 'lucide-react';
+import { Plus, Wallet, CheckCircle2, Clock, Loader2, X, AlertCircle, AlertTriangle, Trash2, Zap, Download, CreditCard, ScanLine, Eye, ExternalLink, Share2, Search } from 'lucide-react';
 import { api, ApiError, getAccessToken } from '../../lib/api';
 import type { Shipment, ExpenseType, ExpenseCategory } from '../../types';
 
@@ -65,6 +65,9 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
   const [isPayingAll, setIsPayingAll] = useState(false);
   const [showPayAllConfirm, setShowPayAllConfirm] = useState(false);
   const [statusAdvanceMsg, setStatusAdvanceMsg] = useState('');
+  const [showInvoicePreview, setShowInvoicePreview] = useState(false);
+  const [invoicePdfUrl, setInvoicePdfUrl] = useState<string | null>(null);
+  const [isLoadingInvoice, setIsLoadingInvoice] = useState(false);
 
   const [newExpense, setNewExpense] = useState({
     type: 'DISBURSEMENT' as ExpenseType,
@@ -312,6 +315,55 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
     api.downloadFile(`/export/shipment/${shipment.id}/facture`, `facture-${shipment.trackingNumber || shipment.id}.pdf`);
   };
 
+  const handlePreviewInvoice = async () => {
+    setShowInvoicePreview(true);
+    setIsLoadingInvoice(true);
+    try {
+      const url = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/export/shipment/${shipment.id}/facture`;
+      const headers: Record<string, string> = {};
+      const token = getAccessToken();
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(url, { method: 'GET', headers, credentials: 'include' });
+      if (!res.ok) throw new Error('Erreur');
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      setInvoicePdfUrl(blobUrl);
+    } catch {
+      setInvoicePdfUrl(null);
+    } finally {
+      setIsLoadingInvoice(false);
+    }
+  };
+
+  const handleOpenInvoiceNewTab = () => {
+    if (invoicePdfUrl) window.open(invoicePdfUrl, '_blank');
+  };
+
+  const handleShareInvoice = async () => {
+    if (!invoicePdfUrl) return;
+    try {
+      const res = await fetch(invoicePdfUrl);
+      const blob = await res.blob();
+      const file = new File([blob], `facture-${shipment.trackingNumber || shipment.id}.pdf`, { type: 'application/pdf' });
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ title: `Facture ${shipment.trackingNumber}`, files: [file] });
+      } else {
+        // Fallback: copy link or download
+        handleDownloadInvoice();
+      }
+    } catch {
+      handleDownloadInvoice();
+    }
+  };
+
+  const closeInvoicePreview = () => {
+    setShowInvoicePreview(false);
+    if (invoicePdfUrl) {
+      URL.revokeObjectURL(invoicePdfUrl);
+      setInvoicePdfUrl(null);
+    }
+  };
+
   // === OCR Scan-to-Invoice ===
   const [isScanning, setIsScanning] = useState(false);
   const scanInputRef = useRef<HTMLInputElement>(null);
@@ -426,14 +478,14 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
           </button>
         )}
 
-        {/* Download Invoice */}
+        {/* Invoice Preview */}
         {shipment.expenses && shipment.expenses.length > 0 && (
           <button
-            onClick={handleDownloadInvoice}
+            onClick={handlePreviewInvoice}
             className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 text-white rounded-xl text-sm font-medium hover:bg-slate-900 transition-colors shadow-sm"
           >
-            <Download size={16} />
-            Télécharger la facture
+            <Eye size={16} />
+            Voir la facture
           </button>
         )}
 
@@ -802,6 +854,115 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
               >
                 {isPayingAll ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
                 Confirmer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Invoice Preview Popup */}
+      {showInvoicePreview && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={closeInvoicePreview}>
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-slate-100">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Aperçu de la facture</h2>
+                <p className="text-sm text-slate-500 mt-0.5">
+                  Dossier {shipment.trackingNumber || shipment.blNumber || '—'}
+                  {shipment.clientName && ` • ${shipment.clientName}`}
+                </p>
+              </div>
+              <button onClick={closeInvoicePreview} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+                <X size={20} className="text-slate-500" />
+              </button>
+            </div>
+
+            {/* Summary */}
+            <div className="grid grid-cols-3 gap-3 p-5 bg-slate-50 border-b border-slate-100">
+              <div className="text-center">
+                <p className="text-xs text-slate-500 uppercase tracking-wide">Provisions</p>
+                <p className="text-lg font-bold text-blue-600">{totalProvisions.toLocaleString('fr-FR')} GNF</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-slate-500 uppercase tracking-wide">Débours</p>
+                <p className="text-lg font-bold text-amber-600">{totalDisbursements.toLocaleString('fr-FR')} GNF</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-slate-500 uppercase tracking-wide">Solde</p>
+                <p className={`text-lg font-bold ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {balance.toLocaleString('fr-FR')} GNF
+                </p>
+              </div>
+            </div>
+
+            {/* PDF Preview */}
+            <div className="flex-1 min-h-0 p-4">
+              {isLoadingInvoice ? (
+                <div className="flex items-center justify-center h-64">
+                  <Loader2 size={32} className="animate-spin text-slate-400" />
+                  <span className="ml-3 text-slate-500">Chargement de la facture...</span>
+                </div>
+              ) : invoicePdfUrl ? (
+                <div
+                  className="w-full h-[400px] rounded-xl overflow-hidden border border-slate-200 cursor-pointer group relative"
+                  onClick={handleOpenInvoiceNewTab}
+                >
+                  <iframe
+                    src={invoicePdfUrl}
+                    className="w-full h-full"
+                    title="Aperçu facture"
+                  />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                    <div className="bg-white/90 backdrop-blur-sm px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 text-sm font-medium text-slate-700">
+                      <ExternalLink size={16} />
+                      Ouvrir en plein écran
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-64 text-slate-400">
+                  <AlertCircle size={24} className="mr-2" />
+                  Impossible de charger la facture
+                </div>
+              )}
+            </div>
+
+            {/* Bottom Buttons: Partager + Rechercher + Télécharger */}
+            <div className="flex items-center gap-3 p-5 border-t border-slate-100 bg-slate-50 rounded-b-2xl">
+              <button
+                onClick={handleShareInvoice}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"
+              >
+                <Share2 size={16} />
+                Partager
+              </button>
+              <button
+                onClick={() => {
+                  closeInvoicePreview();
+                  // Navigate to accounting/search view
+                  const searchInput = document.querySelector<HTMLInputElement>('[data-search-input]');
+                  if (searchInput) {
+                    searchInput.focus();
+                    searchInput.value = shipment.trackingNumber || shipment.blNumber || '';
+                  }
+                }}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-300 transition-colors"
+              >
+                <Search size={16} />
+                Rechercher
+              </button>
+              <button
+                onClick={() => {
+                  handleDownloadInvoice();
+                }}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-800 text-white rounded-xl text-sm font-medium hover:bg-slate-900 transition-colors shadow-sm"
+              >
+                <Download size={16} />
+                Télécharger
               </button>
             </div>
           </div>
