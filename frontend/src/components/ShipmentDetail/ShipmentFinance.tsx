@@ -474,17 +474,6 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
           </button>
         )}
 
-        {/* Invoice Preview */}
-        {shipment.expenses && shipment.expenses.length > 0 && (
-          <button
-            onClick={handlePreviewInvoice}
-            className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 text-white rounded-xl text-sm font-medium hover:bg-slate-900 transition-colors shadow-sm"
-          >
-            <Eye size={16} />
-            Voir la facture
-          </button>
-        )}
-
         {/* OCR Scan-to-Invoice */}
         <input
           ref={scanInputRef}
