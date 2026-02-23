@@ -11,15 +11,17 @@ import { log } from '../config/logger.js';
 
 const DOCUMENT_STATUS_MAP: Record<string, string> = {
   // Document type → status to advance to
-  'BL':           'PENDING',           // BL reçu → dossier en cours
-  'DDI':          'DDI_OBTAINED',      // DDI reçu → DDI obtenu
-  'DECLARATION':  'DECLARATION_FILED', // Déclaration → déclaration déposée
-  'LIQUIDATION':  'LIQUIDATION_ISSUED',// Liquidation → liquidation émise
-  'QUITTANCE':    'CUSTOMS_PAID',      // Quittance → droits payés
-  'BAE':          'BAE_ISSUED',        // BAE → BAE émis
-  'DO':           'DO_RELEASED',       // DO → DO libéré
-  'EXIT_NOTE':    'EXIT_NOTE_ISSUED',  // Bon de sortie → bon émis
-  'DELIVERY_NOTE':'DELIVERED',         // Bon de livraison → livré
+  'BL':               'PENDING',           // BL reçu → dossier en cours
+  'DDI':              'DDI_OBTAINED',      // DDI reçu → DDI obtenu
+  'DECLARATION':      'DECLARATION_FILED', // Déclaration → déclaration déposée
+  'LIQUIDATION':      'LIQUIDATION_ISSUED',// Liquidation → liquidation émise
+  'QUITTANCE':        'CUSTOMS_PAID',      // Quittance → droits payés
+  'BAE':              'BAE_ISSUED',        // BAE → BAE émis
+  'TERMINAL_INVOICE': 'TERMINAL_PAID',     // Facture terminal → terminal payé
+  'TERMINAL_RECEIPT': 'TERMINAL_PAID',     // Reçu terminal → terminal payé
+  'DO':               'DO_RELEASED',       // DO → DO libéré
+  'EXIT_NOTE':        'EXIT_NOTE_ISSUED',  // Bon de sortie → bon émis
+  'DELIVERY_NOTE':    'DELIVERED',         // Bon de livraison → livré
 };
 
 // Status order for comparison (can only go forward)

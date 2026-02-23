@@ -37,10 +37,25 @@ const documentTypeLabels: Record<DocumentType, string> = {
 const documentTypeColors: Record<string, string> = {
   BL: 'bg-blue-100 text-blue-700',
   INVOICE: 'bg-green-100 text-green-700',
+  PACKING_LIST: 'bg-lime-100 text-lime-700',
   DDI: 'bg-purple-100 text-purple-700',
+  PHYTO_CERT: 'bg-emerald-100 text-emerald-700',
+  ORIGIN_CERT: 'bg-teal-100 text-teal-700',
+  EUR1: 'bg-sky-100 text-sky-700',
+  TRANSIT_ORDER: 'bg-violet-100 text-violet-700',
   DECLARATION: 'bg-indigo-100 text-indigo-700',
+  LIQUIDATION: 'bg-fuchsia-100 text-fuchsia-700',
   QUITTANCE: 'bg-amber-100 text-amber-700',
   BAE: 'bg-cyan-100 text-cyan-700',
+  DO: 'bg-sky-100 text-sky-700',
+  EXIT_NOTE: 'bg-teal-100 text-teal-700',
+  EIR: 'bg-stone-100 text-stone-700',
+  TERMINAL_INVOICE: 'bg-rose-100 text-rose-700',
+  TERMINAL_RECEIPT: 'bg-pink-100 text-pink-700',
+  MSC_INVOICE: 'bg-orange-100 text-orange-700',
+  DELIVERY_NOTE: 'bg-emerald-100 text-emerald-700',
+  CUSTOMS_INVOICE: 'bg-red-100 text-red-700',
+  OTHER: 'bg-slate-100 text-slate-600',
 };
 
 export const ShipmentDocuments: React.FC<ShipmentDocumentsProps> = ({ shipment, onRefresh }) => {
