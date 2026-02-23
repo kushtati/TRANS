@@ -1,40 +1,12 @@
 // src/services/document-extract.service.ts
 // Auto-extract shipment fields from uploaded documents using Gemini AI
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Prisma } from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
-import { env } from '../config/env.js';
 import { log } from '../config/logger.js';
 import { prisma } from '../config/prisma.js';
-
-// =============================================
-// Gemini client (shared)
-// =============================================
-
-const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
-const genAI = env.GEMINI_API_KEY ? new GoogleGenerativeAI(env.GEMINI_API_KEY) : null;
-let geminiModel: ReturnType<GoogleGenerativeAI['getGenerativeModel']> | null = null;
-
-// Initialize model on first call
-async function getModel() {
-  if (geminiModel) return geminiModel;
-  if (!genAI) return null;
-
-  for (const m of GEMINI_MODELS) {
-    try {
-      const testModel = genAI.getGenerativeModel({ model: m });
-      await testModel.generateContent('test');
-      geminiModel = testModel;
-      log.info(`Document extract: AI model selected → ${m}`);
-      return geminiModel;
-    } catch {
-      // try next model
-    }
-  }
-  return null;
-}
+import { getGeminiModel, ensureGeminiReady } from '../config/gemini.js';
 
 // =============================================
 // Extraction prompts per document type
@@ -300,7 +272,9 @@ export async function extractAndUpdateShipment(
     return null;
   }
 
-  const model = await getModel();
+  // Wait for shared Gemini init (from config/gemini.ts)
+  await ensureGeminiReady();
+  const model = getGeminiModel();
   if (!model) {
     log.warn('Document extract: Gemini AI not available');
     return null;

@@ -1,12 +1,11 @@
 // server/routes/ai.ts
 
 import { Router, Request, Response } from 'express';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { z } from 'zod';
-import { env } from '../config/env.js';
 import { log } from '../config/logger.js';
 import { prisma } from '../config/prisma.js';
 import { auth } from '../middleware/auth.js';
+import { getGeminiModel, getGeminiModelName } from '../config/gemini.js';
 import rateLimit from 'express-rate-limit';
 
 const router = Router();
@@ -20,29 +19,8 @@ const aiLimiter = rateLimit({
 });
 router.use(aiLimiter);
 
-// Gemini client — try multiple models for compatibility
-const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
-const genAI = env.GEMINI_API_KEY ? new GoogleGenerativeAI(env.GEMINI_API_KEY) : null;
-let GEMINI_MODEL = GEMINI_MODELS[0];
-let model = genAI?.getGenerativeModel({ model: GEMINI_MODEL });
-
-// Test and select best available model on startup
-if (genAI) {
-  (async () => {
-    for (const m of GEMINI_MODELS) {
-      try {
-        const testModel = genAI.getGenerativeModel({ model: m });
-        await testModel.generateContent('test');
-        GEMINI_MODEL = m;
-        model = testModel;
-        log.info(`AI model selected: ${m}`);
-        break;
-      } catch (e: any) {
-        log.warn(`AI model ${m} unavailable: ${e.message?.substring(0, 80)}`);
-      }
-    }
-  })();
-}
+// Gemini model — shared singleton from config/gemini.ts
+// (initialized once at startup, used by all AI routes)
 
 // Schemas
 const chatSchema = z.object({
@@ -71,9 +49,10 @@ Réponds de manière concise en français. Utilise des montants en GNF.`;
 // ============================================
 
 router.get('/status', (req: Request, res: Response) => {
+  const model = getGeminiModel();
   res.json({
     success: true,
-    data: { available: !!model, model: model ? GEMINI_MODEL : null },
+    data: { available: !!model, model: model ? getGeminiModelName() : null },
   });
 });
 
@@ -83,6 +62,7 @@ router.get('/status', (req: Request, res: Response) => {
 
 router.post('/chat', async (req: Request, res: Response) => {
   try {
+    const model = getGeminiModel();
     if (!model) {
       return res.status(503).json({
         success: false,
@@ -275,6 +255,7 @@ Extrais le MAXIMUM d'informations. Mieux vaut deviner intelligemment que laisser
 
 router.post('/extract-bl', blUpload.single('file'), async (req: Request, res: Response) => {
   try {
+    const model = getGeminiModel();
     if (!model) {
       return res.status(503).json({
         success: false,
@@ -486,6 +467,7 @@ Extrais le MAXIMUM. Mieux vaut deviner intelligemment que laisser vide.`;
 
 router.post('/scan-to-overlay', blUpload.single('file'), async (req: Request, res: Response) => {
   try {
+    const model = getGeminiModel();
     if (!model) {
       return res.status(503).json({
         success: false,
@@ -719,6 +701,7 @@ Analyse le PDF attentivement et retourne le JSON.`;
 
 router.post('/auto-position-fields', blUpload.single('file'), async (req: Request, res: Response) => {
   try {
+    const model = getGeminiModel();
     if (!model) {
       return res.status(503).json({
         success: false,
