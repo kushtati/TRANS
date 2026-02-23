@@ -890,10 +890,10 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
                 </div>
               ) : invoicePdfUrl ? (
                 <iframe
-                  src={`${invoicePdfUrl}#toolbar=1&navpanes=0&view=FitH`}
+                  src={`${invoicePdfUrl}#toolbar=0&navpanes=0&view=FitPage&scrollbar=0`}
                   className="w-full h-full border-0"
                   title="Facture"
-                  style={{ minHeight: '100%' }}
+                  style={{ overflow: 'hidden' }}
                 />
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-2">
@@ -926,8 +926,9 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
                 <span>Rechercher</span>
               </button>
               <button
-                onClick={handleDownloadInvoice}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-slate-800 text-white rounded-xl text-sm font-medium hover:bg-slate-900 active:scale-[0.97] transition-all"
+                onClick={() => { if (invoicePdfUrl) window.open(invoicePdfUrl, '_blank'); }}
+                disabled={!invoicePdfUrl}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-slate-800 text-white rounded-xl text-sm font-medium hover:bg-slate-900 active:scale-[0.97] transition-all disabled:opacity-50"
               >
                 <Download size={15} />
                 <span>Télécharger</span>
