@@ -1,7 +1,7 @@
 // src/components/ShipmentDetail/ShipmentFinance.tsx
 
 import React, { useState, useMemo, useRef } from 'react';
-import { Plus, Wallet, CheckCircle2, Clock, Loader2, X, AlertCircle, AlertTriangle, Trash2, Zap, Download, CreditCard, ScanLine, Eye, ExternalLink, Share2, Search } from 'lucide-react';
+import { Plus, Wallet, CheckCircle2, Clock, Loader2, X, AlertCircle, AlertTriangle, Trash2, Zap, Download, CreditCard, ScanLine, Eye, Share2, Search } from 'lucide-react';
 import { api, ApiError, getAccessToken } from '../../lib/api';
 import type { Shipment, ExpenseType, ExpenseCategory } from '../../types';
 
@@ -333,10 +333,6 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
     } finally {
       setIsLoadingInvoice(false);
     }
-  };
-
-  const handleOpenInvoiceNewTab = () => {
-    if (invoicePdfUrl) window.open(invoicePdfUrl, '_blank');
   };
 
   const handleShareInvoice = async () => {
@@ -862,77 +858,45 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
 
       {/* Invoice Preview Popup */}
       {showInvoicePreview && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={closeInvoicePreview}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-3" onClick={closeInvoicePreview}>
           <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95"
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col overflow-hidden"
+            style={{ height: '92vh' }}
             onClick={e => e.stopPropagation()}
           >
-            {/* Header */}
-            <div className="flex items-center justify-between p-5 border-b border-slate-100">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900">Aperçu de la facture</h2>
-                <p className="text-sm text-slate-500 mt-0.5">
-                  Dossier {shipment.trackingNumber || shipment.blNumber || '—'}
-                  {shipment.clientName && ` • ${shipment.clientName}`}
-                </p>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 shrink-0">
+              <div className="flex items-center gap-3">
+                <h2 className="text-base font-bold text-slate-900">Facture</h2>
+                <span className="text-sm text-slate-400">
+                  {shipment.trackingNumber || shipment.blNumber || '—'}
+                  {shipment.clientName && ` — ${shipment.clientName}`}
+                </span>
               </div>
-              <button onClick={closeInvoicePreview} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
-                <X size={20} className="text-slate-500" />
+              <button onClick={closeInvoicePreview} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
+                <X size={18} className="text-slate-400" />
               </button>
             </div>
 
-            {/* Summary */}
-            <div className="grid grid-cols-3 gap-3 p-5 bg-slate-50 border-b border-slate-100">
-              <div className="text-center">
-                <p className="text-xs text-slate-500 uppercase tracking-wide">Provisions</p>
-                <p className="text-lg font-bold text-blue-600">{totalProvisions.toLocaleString('fr-FR')} GNF</p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-slate-500 uppercase tracking-wide">Débours</p>
-                <p className="text-lg font-bold text-amber-600">{totalDisbursements.toLocaleString('fr-FR')} GNF</p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-slate-500 uppercase tracking-wide">Solde</p>
-                <p className={`text-lg font-bold ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {balance.toLocaleString('fr-FR')} GNF
-                </p>
-              </div>
-            </div>
-
-            {/* PDF Preview */}
-            <div className="flex-1 min-h-0 p-4">
+            <div className="flex-1 min-h-0 bg-slate-100">
               {isLoadingInvoice ? (
-                <div className="flex items-center justify-center h-64">
-                  <Loader2 size={32} className="animate-spin text-slate-400" />
-                  <span className="ml-3 text-slate-500">Chargement de la facture...</span>
+                <div className="flex items-center justify-center h-full">
+                  <Loader2 size={28} className="animate-spin text-slate-400" />
                 </div>
               ) : invoicePdfUrl ? (
-                <div
-                  className="w-full h-[400px] rounded-xl overflow-hidden border border-slate-200 cursor-pointer group relative"
-                  onClick={handleOpenInvoiceNewTab}
-                >
-                  <iframe
-                    src={invoicePdfUrl}
-                    className="w-full h-full"
-                    title="Aperçu facture"
-                  />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                    <div className="bg-white/90 backdrop-blur-sm px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 text-sm font-medium text-slate-700">
-                      <ExternalLink size={16} />
-                      Ouvrir en plein écran
-                    </div>
-                  </div>
-                </div>
+                <iframe
+                  src={`${invoicePdfUrl}#toolbar=1&navpanes=0&view=FitH`}
+                  className="w-full h-full border-0"
+                  title="Facture"
+                />
               ) : (
-                <div className="flex items-center justify-center h-64 text-slate-400">
-                  <AlertCircle size={24} className="mr-2" />
-                  Impossible de charger la facture
+                <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-2">
+                  <AlertCircle size={28} />
+                  <span className="text-sm">Impossible de charger la facture</span>
                 </div>
               )}
             </div>
 
-            {/* Bottom Buttons: Partager + Rechercher + Télécharger */}
-            <div className="flex items-center gap-3 p-5 border-t border-slate-100 bg-slate-50 rounded-b-2xl">
+            <div className="flex items-center gap-3 px-5 py-3 border-t border-slate-100 shrink-0">
               <button
                 onClick={handleShareInvoice}
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"
@@ -943,7 +907,6 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
               <button
                 onClick={() => {
                   closeInvoicePreview();
-                  // Navigate to accounting/search view
                   const searchInput = document.querySelector<HTMLInputElement>('[data-search-input]');
                   if (searchInput) {
                     searchInput.focus();
@@ -956,9 +919,7 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
                 Rechercher
               </button>
               <button
-                onClick={() => {
-                  handleDownloadInvoice();
-                }}
+                onClick={handleDownloadInvoice}
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-800 text-white rounded-xl text-sm font-medium hover:bg-slate-900 transition-colors shadow-sm"
               >
                 <Download size={16} />
