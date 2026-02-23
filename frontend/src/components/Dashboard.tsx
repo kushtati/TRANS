@@ -1,12 +1,13 @@
-// src/components/Dashboard.tsx — Premium enterprise dashboard v4.1
+// src/components/Dashboard.tsx — Premium enterprise dashboard v4.2 (expandable cards)
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Ship, Package, Clock, CheckCircle2, AlertTriangle,
   TrendingUp, TrendingDown, Plus, Search, RefreshCw,
-  ChevronRight, Anchor, FileText,
+  ChevronRight, ChevronDown, ChevronUp, Anchor, FileText,
   ArrowUpRight, ArrowDownRight, Activity,
-  Truck, CircleDollarSign, Zap
+  Truck, CircleDollarSign, Zap, X, Eye,
+  Calendar, MapPin, Hash, DollarSign, Layers
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useDebounce } from '../hooks/useDebounce';
@@ -29,6 +30,42 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [refreshing, setRefreshing] = useState(false);
+  const [expandedCard, setExpandedCard] = useState<string | null>(null);
+  const [cardShipments, setCardShipments] = useState<Shipment[]>([]);
+  const [cardLoading, setCardLoading] = useState(false);
+
+  // Status groups for each KPI card
+  const statusGroups: Record<string, string[]> = {
+    pending: ['PENDING', 'DRAFT'],
+    inProgress: ['ARRIVED', 'DDI_OBTAINED', 'DECLARATION_FILED', 'LIQUIDATION_ISSUED', 'CUSTOMS_PAID', 'BAE_ISSUED', 'TERMINAL_PAID', 'DO_RELEASED', 'EXIT_NOTE_ISSUED', 'IN_DELIVERY'],
+    delivered: ['DELIVERED', 'INVOICED', 'CLOSED'],
+  };
+
+  const toggleCard = useCallback(async (key: string) => {
+    if (expandedCard === key) {
+      setExpandedCard(null);
+      setCardShipments([]);
+      return;
+    }
+    setExpandedCard(key);
+    setCardLoading(true);
+    try {
+      if (key === 'finance') {
+        // Load all shipments for finance details
+        const res = await api.get<{ shipments: Shipment[] }>('/shipments?limit=50');
+        if (res.data?.shipments) setCardShipments(res.data.shipments);
+      } else {
+        const statuses = statusGroups[key] || [];
+        const all: Shipment[] = [];
+        for (const st of statuses) {
+          const res = await api.get<{ shipments: Shipment[] }>(`/shipments?status=${st}&limit=20`);
+          if (res.data?.shipments) all.push(...res.data.shipments);
+        }
+        setCardShipments(all);
+      }
+    } catch (e) { console.error('Card expand error:', e); }
+    finally { setCardLoading(false); }
+  }, [expandedCard]);
 
   useEffect(() => {
     if (externalSearch !== undefined) setSearchQuery(externalSearch);
@@ -161,10 +198,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* ═══ KPI PIPELINE ═══ */}
       <div className="grid grid-cols-3 gap-3 md:gap-4">
-        {pipeline.map((p, idx) => (
+        {pipeline.map((p) => (
           <div
             key={p.key}
-            className={`relative overflow-hidden bg-white rounded-2xl border border-stone-200/60 p-4 md:p-5 hover:shadow-lg hover:shadow-stone-200/50 transition-all duration-300 group animate-fade-up stagger-${idx + 1} tap-highlight active:scale-[0.98]`}
+            onClick={() => toggleCard(p.key)}
+            className={`relative overflow-hidden bg-white rounded-2xl border p-4 md:p-5 transition-all duration-300 group cursor-pointer tap-highlight active:scale-[0.98] ${
+              expandedCard === p.key
+                ? 'border-stone-300 shadow-lg shadow-stone-200/50 ring-1 ring-stone-200'
+                : 'border-stone-200/60 hover:shadow-lg hover:shadow-stone-200/50'
+            }`}
           >
             <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${p.color}`} />
             <div className="flex items-start justify-between">
@@ -175,9 +217,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   sur {stats?.shipments.total || 0} dossiers
                 </p>
               </div>
-              <div className={`w-9 h-9 md:w-11 md:h-11 rounded-xl bg-gradient-to-br ${p.color} flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform shrink-0`}>
-                <p.icon size={18} className="text-white md:hidden" />
-                <p.icon size={20} className="text-white hidden md:block" />
+              <div className="flex flex-col items-center gap-1.5 shrink-0">
+                <div className={`w-9 h-9 md:w-11 md:h-11 rounded-xl bg-gradient-to-br ${p.color} flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform`}>
+                  <p.icon size={18} className="text-white md:hidden" />
+                  <p.icon size={20} className="text-white hidden md:block" />
+                </div>
+                {expandedCard === p.key
+                  ? <ChevronUp size={14} className="text-stone-400" />
+                  : <ChevronDown size={14} className="text-stone-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                }
               </div>
             </div>
             <div className="mt-3 h-1.5 bg-stone-100 rounded-full overflow-hidden">
@@ -190,15 +238,179 @@ export const Dashboard: React.FC<DashboardProps> = ({
         ))}
       </div>
 
+      {/* ═══ EXPANDED KPI DETAIL PANEL ═══ */}
+      {expandedCard && expandedCard !== 'finance' && (
+        <div className="bg-white rounded-2xl border border-stone-200/60 overflow-hidden animate-in slide-in-from-top-2 duration-300">
+          <div className="px-4 md:px-5 py-3 border-b border-stone-100 flex items-center justify-between">
+            <h2 className="font-semibold text-stone-900 flex items-center gap-2">
+              {expandedCard === 'pending' && <Clock size={16} className="text-amber-500" />}
+              {expandedCard === 'inProgress' && <Activity size={16} className="text-blue-500" />}
+              {expandedCard === 'delivered' && <CheckCircle2 size={16} className="text-green-500" />}
+              {expandedCard === 'pending' ? 'Dossiers en attente' : expandedCard === 'inProgress' ? 'Dossiers en cours' : 'Dossiers livrés'}
+              <span className="text-xs font-normal text-stone-400 ml-1">({cardShipments.length})</span>
+            </h2>
+            <button
+              onClick={(e) => { e.stopPropagation(); setExpandedCard(null); setCardShipments([]); }}
+              className="p-1.5 rounded-lg hover:bg-stone-100 transition-colors"
+            >
+              <X size={16} className="text-stone-400" />
+            </button>
+          </div>
+
+          {cardLoading ? (
+            <div className="p-8 text-center">
+              <RefreshCw size={20} className="text-stone-300 animate-spin mx-auto mb-2" />
+              <p className="text-sm text-stone-400">Chargement...</p>
+            </div>
+          ) : cardShipments.length === 0 ? (
+            <div className="p-8 text-center">
+              <Package size={24} className="text-stone-200 mx-auto mb-2" />
+              <p className="text-sm text-stone-400">Aucun dossier dans cette catégorie</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-stone-100/80 max-h-[480px] overflow-y-auto">
+              {cardShipments.map((s) => {
+                const st = statusMap[s.status] || { label: s.status, color: 'text-stone-500', dot: 'bg-stone-400' };
+                const containers = s.containers || [];
+                const expenses = s.expenses || [];
+                const totalProv = expenses.filter(e => e.type === 'PROVISION').reduce((a, e) => a + e.amount, 0);
+                const totalDisb = expenses.filter(e => e.type === 'DISBURSEMENT').reduce((a, e) => a + e.amount, 0);
+                const unpaid = expenses.filter(e => !e.paid).reduce((a, e) => a + e.amount, 0);
+
+                return (
+                  <div key={s.id} className="px-4 md:px-5 py-4 hover:bg-stone-50/60 transition-all">
+                    {/* Row 1: Client + status + action */}
+                    <div className="flex items-center justify-between mb-2.5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <h3 className="font-semibold text-stone-900 text-[15px] truncate">{s.clientName}</h3>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className={`w-2 h-2 rounded-full ${st.dot}`} />
+                          <span className={`text-[11px] font-medium ${st.color}`}>{st.label}</span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onViewShipment(s.id); }}
+                        className="flex items-center gap-1 text-xs font-semibold text-amber-600 hover:text-amber-700 px-2.5 py-1.5 rounded-lg hover:bg-amber-50 transition-colors shrink-0"
+                      >
+                        <Eye size={13} /> Détails
+                      </button>
+                    </div>
+
+                    {/* Row 2: Identification tags */}
+                    <div className="flex flex-wrap items-center gap-2 mb-3">
+                      <span className="flex items-center gap-1 text-[11px] font-mono text-stone-600 bg-stone-100 px-2 py-1 rounded-md">
+                        <Hash size={10} />{s.trackingNumber}
+                      </span>
+                      {s.blNumber && (
+                        <span className="flex items-center gap-1 text-[11px] text-stone-600 bg-blue-50 px-2 py-1 rounded-md">
+                          <FileText size={10} className="text-blue-500" />BL: {s.blNumber}
+                        </span>
+                      )}
+                      {s.vesselName && (
+                        <span className="flex items-center gap-1 text-[11px] text-stone-600 bg-cyan-50 px-2 py-1 rounded-md">
+                          <Ship size={10} className="text-cyan-500" />{s.vesselName}
+                        </span>
+                      )}
+                      {s.portOfLoading && (
+                        <span className="flex items-center gap-1 text-[11px] text-stone-600 bg-violet-50 px-2 py-1 rounded-md">
+                          <MapPin size={10} className="text-violet-500" />{s.portOfLoading}
+                        </span>
+                      )}
+                      {s.eta && (
+                        <span className="flex items-center gap-1 text-[11px] text-stone-600 bg-amber-50 px-2 py-1 rounded-md">
+                          <Calendar size={10} className="text-amber-500" />ETA: {new Date(s.eta).toLocaleDateString('fr-GN', { day: '2-digit', month: 'short' })}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Row 3: Details grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      {/* Containers */}
+                      <div className="bg-stone-50 rounded-lg p-2.5">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <Package size={12} className="text-stone-400" />
+                          <span className="text-[10px] font-medium text-stone-500 uppercase tracking-wider">Conteneurs</span>
+                        </div>
+                        {containers.length > 0 ? (
+                          <div className="space-y-0.5">
+                            {containers.map((c, ci) => (
+                              <p key={ci} className="text-[11px] text-stone-700 font-mono truncate">
+                                {c.number} <span className="text-stone-400">({c.type})</span>
+                              </p>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-stone-400 italic">Aucun</p>
+                        )}
+                      </div>
+
+                      {/* Provisions */}
+                      <div className="bg-green-50/60 rounded-lg p-2.5">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <ArrowDownRight size={12} className="text-green-500" />
+                          <span className="text-[10px] font-medium text-stone-500 uppercase tracking-wider">Provisions</span>
+                        </div>
+                        <p className="text-sm font-bold text-green-700 tabular-nums">{fmt(totalProv)} <span className="text-[9px] font-normal text-stone-400">GNF</span></p>
+                      </div>
+
+                      {/* Débours */}
+                      <div className="bg-red-50/60 rounded-lg p-2.5">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <ArrowUpRight size={12} className="text-red-500" />
+                          <span className="text-[10px] font-medium text-stone-500 uppercase tracking-wider">Débours</span>
+                        </div>
+                        <p className="text-sm font-bold text-red-700 tabular-nums">{fmt(totalDisb)} <span className="text-[9px] font-normal text-stone-400">GNF</span></p>
+                      </div>
+
+                      {/* Solde / Impayés */}
+                      <div className={`rounded-lg p-2.5 ${unpaid > 0 ? 'bg-amber-50/60' : 'bg-emerald-50/60'}`}>
+                        <div className="flex items-center gap-1.5 mb-1">
+                          {unpaid > 0 ? <AlertTriangle size={12} className="text-amber-500" /> : <CheckCircle2 size={12} className="text-emerald-500" />}
+                          <span className="text-[10px] font-medium text-stone-500 uppercase tracking-wider">{unpaid > 0 ? 'Impayés' : 'Solde'}</span>
+                        </div>
+                        <p className={`text-sm font-bold tabular-nums ${unpaid > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
+                          {unpaid > 0 ? fmt(unpaid) : fmt(totalProv - totalDisb)} <span className="text-[9px] font-normal text-stone-400">GNF</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Row 4: Description + meta */}
+                    {s.description && (
+                      <p className="text-[12px] text-stone-500 mt-2.5 line-clamp-2">{s.description}</p>
+                    )}
+                    <div className="flex items-center gap-3 mt-2 text-[10px] text-stone-400">
+                      <span>Créé: {new Date(s.createdAt).toLocaleDateString('fr-GN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                      {s.updatedAt && <span>MAJ: {new Date(s.updatedAt).toLocaleDateString('fr-GN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>}
+                      {(s.documents || []).length > 0 && <span className="flex items-center gap-0.5"><Layers size={9} />{(s.documents || []).length} doc(s)</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ═══ FINANCE + CONTAINERS ═══ */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         {/* Finance Card */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-stone-200/60 p-4 md:p-5 hover:shadow-lg hover:shadow-stone-200/50 transition-all animate-fade-up stagger-4">
+        <div
+          onClick={() => toggleCard('finance')}
+          className={`lg:col-span-2 bg-white rounded-2xl border p-4 md:p-5 transition-all cursor-pointer group ${
+            expandedCard === 'finance'
+              ? 'border-stone-300 shadow-lg shadow-stone-200/50 ring-1 ring-stone-200'
+              : 'border-stone-200/60 hover:shadow-lg hover:shadow-stone-200/50'
+          }`}
+        >
           <div className="flex items-center justify-between mb-4 md:mb-5">
             <h2 className="font-semibold text-stone-900 flex items-center gap-2">
               <CircleDollarSign size={18} className="text-stone-400" />
               Aperçu financier
+              {expandedCard === 'finance'
+                ? <ChevronUp size={14} className="text-stone-400" />
+                : <ChevronDown size={14} className="text-stone-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+              }
             </h2>
             <span className={`text-[11px] md:text-xs px-2.5 py-1 rounded-full font-medium ${balance >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
               Solde: {balance >= 0 ? '+' : '-'}{fmt(Math.abs(balance))} GNF
@@ -226,7 +438,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
 
         {/* Containers Card */}
-        <div className="bg-white rounded-2xl border border-stone-200/60 p-4 md:p-5 hover:shadow-lg hover:shadow-stone-200/50 transition-all animate-fade-up stagger-5">
+        <div className="bg-white rounded-2xl border border-stone-200/60 p-4 md:p-5 hover:shadow-lg hover:shadow-stone-200/50 transition-all">
           <h2 className="font-semibold text-stone-900 flex items-center gap-2 mb-4 md:mb-5">
             <Package size={18} className="text-stone-400" />
             Conteneurs
@@ -243,9 +455,151 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
+      {/* ═══ EXPANDED FINANCE DETAIL PANEL ═══ */}
+      {expandedCard === 'finance' && (
+        <div className="bg-white rounded-2xl border border-stone-200/60 overflow-hidden">
+          <div className="px-4 md:px-5 py-3 border-b border-stone-100 flex items-center justify-between">
+            <h2 className="font-semibold text-stone-900 flex items-center gap-2">
+              <DollarSign size={16} className="text-green-500" />
+              Détail financier par dossier
+              <span className="text-xs font-normal text-stone-400 ml-1">({cardShipments.length})</span>
+            </h2>
+            <button
+              onClick={(e) => { e.stopPropagation(); setExpandedCard(null); setCardShipments([]); }}
+              className="p-1.5 rounded-lg hover:bg-stone-100 transition-colors"
+            >
+              <X size={16} className="text-stone-400" />
+            </button>
+          </div>
+
+          {cardLoading ? (
+            <div className="p-8 text-center">
+              <RefreshCw size={20} className="text-stone-300 animate-spin mx-auto mb-2" />
+              <p className="text-sm text-stone-400">Chargement...</p>
+            </div>
+          ) : (
+            <div className="max-h-[480px] overflow-y-auto">
+              {/* Table header */}
+              <div className="hidden md:grid grid-cols-12 gap-2 px-4 md:px-5 py-2.5 bg-stone-50 border-b border-stone-100 text-[10px] font-medium text-stone-500 uppercase tracking-wider sticky top-0 z-10">
+                <div className="col-span-3">Client</div>
+                <div className="col-span-2">Tracking / BL</div>
+                <div className="col-span-1 text-center">TC</div>
+                <div className="col-span-2 text-right">Provisions</div>
+                <div className="col-span-2 text-right">Débours</div>
+                <div className="col-span-2 text-right">Solde</div>
+              </div>
+
+              {cardShipments.map((s) => {
+                const st = statusMap[s.status] || { label: s.status, color: 'text-stone-500', dot: 'bg-stone-400' };
+                const expenses = s.expenses || [];
+                const prov = expenses.filter(e => e.type === 'PROVISION').reduce((a, e) => a + e.amount, 0);
+                const disb = expenses.filter(e => e.type === 'DISBURSEMENT').reduce((a, e) => a + e.amount, 0);
+                const solde = prov - disb;
+                const unpaidCount = expenses.filter(e => !e.paid).length;
+
+                return (
+                  <div key={s.id} className="px-4 md:px-5 py-3 border-b border-stone-50 hover:bg-stone-50/60 transition-all">
+                    {/* Mobile layout */}
+                    <div className="md:hidden space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <h3 className="font-semibold text-stone-900 text-[14px] truncate">{s.clientName}</h3>
+                          <span className={`w-2 h-2 rounded-full shrink-0 ${st.dot}`} />
+                        </div>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onViewShipment(s.id); }}
+                          className="text-[11px] font-semibold text-amber-600 px-2 py-1 rounded-lg hover:bg-amber-50 shrink-0"
+                        >
+                          <Eye size={12} />
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2 text-[10px] text-stone-400">
+                        <span className="font-mono">{s.trackingNumber}</span>
+                        {s.blNumber && <span>· BL: {s.blNumber}</span>}
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="bg-green-50/60 rounded-lg p-2 text-center">
+                          <p className="text-[9px] text-stone-400 uppercase">Prov.</p>
+                          <p className="text-xs font-bold text-green-700 tabular-nums">{fmt(prov)}</p>
+                        </div>
+                        <div className="bg-red-50/60 rounded-lg p-2 text-center">
+                          <p className="text-[9px] text-stone-400 uppercase">Déb.</p>
+                          <p className="text-xs font-bold text-red-700 tabular-nums">{fmt(disb)}</p>
+                        </div>
+                        <div className={`rounded-lg p-2 text-center ${solde >= 0 ? 'bg-emerald-50/60' : 'bg-amber-50/60'}`}>
+                          <p className="text-[9px] text-stone-400 uppercase">Solde</p>
+                          <p className={`text-xs font-bold tabular-nums ${solde >= 0 ? 'text-emerald-700' : 'text-amber-700'}`}>{solde >= 0 ? '+' : ''}{fmt(solde)}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Desktop layout */}
+                    <div className="hidden md:grid grid-cols-12 gap-2 items-center">
+                      <div className="col-span-3 flex items-center gap-2 min-w-0">
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${st.dot}`} />
+                        <span className="font-semibold text-stone-800 text-[13px] truncate">{s.clientName}</span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onViewShipment(s.id); }}
+                          className="opacity-0 group-hover:opacity-100 text-amber-600 shrink-0"
+                        >
+                          <Eye size={12} />
+                        </button>
+                      </div>
+                      <div className="col-span-2 text-[11px] text-stone-500 truncate">
+                        <span className="font-mono">{s.trackingNumber}</span>
+                        {s.blNumber && <span className="block text-[10px] text-stone-400 truncate">BL: {s.blNumber}</span>}
+                      </div>
+                      <div className="col-span-1 text-center text-[12px] font-medium text-stone-600 tabular-nums">
+                        {(s.containers || []).length}
+                      </div>
+                      <div className="col-span-2 text-right text-[13px] font-semibold text-green-700 tabular-nums">
+                        {fmt(prov)} <span className="text-[9px] font-normal text-stone-400">GNF</span>
+                      </div>
+                      <div className="col-span-2 text-right text-[13px] font-semibold text-red-600 tabular-nums">
+                        {fmt(disb)} <span className="text-[9px] font-normal text-stone-400">GNF</span>
+                      </div>
+                      <div className="col-span-2 text-right flex items-center justify-end gap-1.5">
+                        <span className={`text-[13px] font-bold tabular-nums ${solde >= 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                          {solde >= 0 ? '+' : ''}{fmt(solde)}
+                        </span>
+                        {unpaidCount > 0 && (
+                          <span className="text-[9px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-full font-medium">{unpaidCount} impayé{unpaidCount > 1 ? 's' : ''}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Totals row */}
+              {cardShipments.length > 0 && (() => {
+                const allExpenses = cardShipments.flatMap(s => s.expenses || []);
+                const totProv = allExpenses.filter(e => e.type === 'PROVISION').reduce((a, e) => a + e.amount, 0);
+                const totDisb = allExpenses.filter(e => e.type === 'DISBURSEMENT').reduce((a, e) => a + e.amount, 0);
+                const totSolde = totProv - totDisb;
+                return (
+                  <div className="hidden md:grid grid-cols-12 gap-2 px-4 md:px-5 py-3 bg-stone-50 border-t border-stone-200 sticky bottom-0 text-[13px] font-bold">
+                    <div className="col-span-3 text-stone-600">Total ({cardShipments.length} dossiers)</div>
+                    <div className="col-span-2" />
+                    <div className="col-span-1 text-center text-stone-600 tabular-nums">
+                      {cardShipments.reduce((a, s) => a + (s.containers || []).length, 0)}
+                    </div>
+                    <div className="col-span-2 text-right text-green-700 tabular-nums">{fmt(totProv)} GNF</div>
+                    <div className="col-span-2 text-right text-red-600 tabular-nums">{fmt(totDisb)} GNF</div>
+                    <div className={`col-span-2 text-right tabular-nums ${totSolde >= 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                      {totSolde >= 0 ? '+' : ''}{fmt(totSolde)} GNF
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ═══ ALERTS ═══ */}
       {stats?.alerts && stats.alerts.length > 0 && (
-        <div className="bg-white rounded-2xl border border-stone-200/60 p-4 md:p-5 animate-fade-up stagger-6">
+        <div className="bg-white rounded-2xl border border-stone-200/60 p-4 md:p-5">
           <div className="flex items-center justify-between mb-3 md:mb-4">
             <h2 className="font-semibold text-stone-900 flex items-center gap-2">
               <Zap size={18} className="text-amber-500" />
