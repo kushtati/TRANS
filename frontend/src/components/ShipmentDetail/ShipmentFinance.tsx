@@ -1,7 +1,7 @@
 // src/components/ShipmentDetail/ShipmentFinance.tsx
 
 import React, { useState, useMemo, useRef } from 'react';
-import { Plus, Wallet, CheckCircle2, Clock, Loader2, X, AlertCircle, AlertTriangle, Trash2, Zap, CreditCard, ScanLine } from 'lucide-react';
+import { Plus, Wallet, CheckCircle2, Clock, Loader2, X, AlertCircle, AlertTriangle, Trash2, Zap, Download, CreditCard, ScanLine } from 'lucide-react';
 import { api, ApiError, getAccessToken } from '../../lib/api';
 import type { Shipment, ExpenseType, ExpenseCategory } from '../../types';
 
@@ -421,6 +421,16 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
           >
             {isPayingAll ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
             Payer tous les frais
+          </button>
+        )}
+
+        {shipment.expenses && shipment.expenses.length > 0 && (
+          <button
+            onClick={() => api.downloadFile(`/export/shipment/${shipment.id}/facture`, `facture-${shipment.trackingNumber || shipment.id}.pdf`)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 text-white rounded-xl text-sm font-medium hover:bg-slate-900 transition-colors shadow-sm"
+          >
+            <Download size={16} />
+            Télécharger la facture
           </button>
         )}
 
