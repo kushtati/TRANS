@@ -1,7 +1,7 @@
 // src/components/ShipmentDetail/ShipmentFinance.tsx
 
 import React, { useState, useMemo, useRef } from 'react';
-import { Plus, Wallet, CheckCircle2, Clock, Loader2, X, AlertCircle, AlertTriangle, Trash2, Zap, Download, CreditCard, ScanLine, Eye, Share2, Search } from 'lucide-react';
+import { Plus, Wallet, CheckCircle2, Clock, Loader2, X, AlertCircle, AlertTriangle, Trash2, Zap, CreditCard, ScanLine } from 'lucide-react';
 import { api, ApiError, getAccessToken } from '../../lib/api';
 import type { Shipment, ExpenseType, ExpenseCategory } from '../../types';
 
@@ -65,9 +65,6 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
   const [isPayingAll, setIsPayingAll] = useState(false);
   const [showPayAllConfirm, setShowPayAllConfirm] = useState(false);
   const [statusAdvanceMsg, setStatusAdvanceMsg] = useState('');
-  const [showInvoicePreview, setShowInvoicePreview] = useState(false);
-  const [invoicePdfUrl, setInvoicePdfUrl] = useState<string | null>(null);
-  const [isLoadingInvoice, setIsLoadingInvoice] = useState(false);
 
   const [newExpense, setNewExpense] = useState({
     type: 'DISBURSEMENT' as ExpenseType,
@@ -311,54 +308,7 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
     }
   };
 
-  const handleDownloadInvoice = () => {
-    api.downloadFile(`/export/shipment/${shipment.id}/facture`, `facture-${shipment.trackingNumber || shipment.id}.pdf`);
-  };
 
-  const handlePreviewInvoice = async () => {
-    setShowInvoicePreview(true);
-    setIsLoadingInvoice(true);
-    try {
-      const url = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/export/shipment/${shipment.id}/facture`;
-      const headers: Record<string, string> = {};
-      const token = getAccessToken();
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(url, { method: 'GET', headers, credentials: 'include' });
-      if (!res.ok) throw new Error('Erreur');
-      const blob = await res.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      setInvoicePdfUrl(blobUrl);
-    } catch {
-      setInvoicePdfUrl(null);
-    } finally {
-      setIsLoadingInvoice(false);
-    }
-  };
-
-  const handleShareInvoice = async () => {
-    if (!invoicePdfUrl) return;
-    try {
-      const res = await fetch(invoicePdfUrl);
-      const blob = await res.blob();
-      const file = new File([blob], `facture-${shipment.trackingNumber || shipment.id}.pdf`, { type: 'application/pdf' });
-      if (navigator.share && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ title: `Facture ${shipment.trackingNumber}`, files: [file] });
-      } else {
-        // Fallback: copy link or download
-        handleDownloadInvoice();
-      }
-    } catch {
-      handleDownloadInvoice();
-    }
-  };
-
-  const closeInvoicePreview = () => {
-    setShowInvoicePreview(false);
-    if (invoicePdfUrl) {
-      URL.revokeObjectURL(invoicePdfUrl);
-      setInvoicePdfUrl(null);
-    }
-  };
 
   // === OCR Scan-to-Invoice ===
   const [isScanning, setIsScanning] = useState(false);
@@ -845,87 +795,6 @@ export const ShipmentFinance: React.FC<ShipmentFinanceProps> = ({ shipment, onRe
         </div>
       )}
 
-      {/* Invoice Preview Popup */}
-      {showInvoicePreview && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end sm:items-center sm:justify-center" onClick={closeInvoicePreview}>
-          <div
-            className="bg-white w-full h-full sm:h-[92vh] sm:max-w-4xl sm:rounded-2xl sm:mx-3 shadow-2xl flex flex-col overflow-hidden"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 shrink-0 bg-white">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center shrink-0">
-                  <Eye size={16} className="text-indigo-600" />
-                </div>
-                <div className="min-w-0">
-                  <h2 className="text-sm font-bold text-slate-900 truncate">
-                    Facture {shipment.trackingNumber || shipment.blNumber || ''}
-                  </h2>
-                  {shipment.clientName && (
-                    <p className="text-xs text-slate-400 truncate">{shipment.clientName}</p>
-                  )}
-                </div>
-              </div>
-              <button onClick={closeInvoicePreview} className="p-2 hover:bg-slate-100 rounded-full transition-colors shrink-0 ml-2">
-                <X size={18} className="text-slate-500" />
-              </button>
-            </div>
-
-            <div className="flex-1 min-h-0 bg-slate-50">
-              {isLoadingInvoice ? (
-                <div className="flex flex-col items-center justify-center h-full gap-3">
-                  <Loader2 size={32} className="animate-spin text-indigo-400" />
-                  <span className="text-sm text-slate-400">Chargement...</span>
-                </div>
-              ) : invoicePdfUrl ? (
-                <iframe
-                  src={`${invoicePdfUrl}#toolbar=0&navpanes=0&view=FitPage&scrollbar=0`}
-                  className="w-full h-full border-0"
-                  title="Facture"
-                  style={{ overflow: 'hidden' }}
-                />
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-2">
-                  <AlertCircle size={28} />
-                  <span className="text-sm">Impossible de charger la facture</span>
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2 px-3 py-2.5 border-t border-slate-100 shrink-0 bg-white safe-area-bottom">
-              <button
-                onClick={handleShareInvoice}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 active:scale-[0.97] transition-all"
-              >
-                <Share2 size={15} />
-                <span>Partager</span>
-              </button>
-              <button
-                onClick={() => {
-                  closeInvoicePreview();
-                  const searchInput = document.querySelector<HTMLInputElement>('[data-search-input]');
-                  if (searchInput) {
-                    searchInput.focus();
-                    searchInput.value = shipment.trackingNumber || shipment.blNumber || '';
-                  }
-                }}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-slate-100 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-200 active:scale-[0.97] transition-all"
-              >
-                <Search size={15} />
-                <span>Rechercher</span>
-              </button>
-              <button
-                onClick={() => { if (invoicePdfUrl) window.open(invoicePdfUrl, '_blank'); }}
-                disabled={!invoicePdfUrl}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-slate-800 text-white rounded-xl text-sm font-medium hover:bg-slate-900 active:scale-[0.97] transition-all disabled:opacity-50"
-              >
-                <Download size={15} />
-                <span>Télécharger</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
