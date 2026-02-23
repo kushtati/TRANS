@@ -21,18 +21,21 @@ const router = Router();
 // All shipment routes require authentication
 router.use(auth);
 
-// Shared select for user-facing shipment data
+// Shared select for user-facing shipment data (detail view)
 const shipmentInclude = {
   containers: true,
   documents: {
     orderBy: { createdAt: 'desc' as const },
+    select: { id: true, type: true, name: true, url: true, reference: true, issueDate: true, createdAt: true },
   },
   expenses: {
     orderBy: { createdAt: 'desc' as const },
+    select: { id: true, type: true, category: true, description: true, amount: true, quantity: true, unitPrice: true, reference: true, supplier: true, paid: true, paidAt: true, createdAt: true },
   },
   timeline: {
     orderBy: { date: 'desc' as const },
-    take: 50,
+    take: 20,
+    select: { id: true, action: true, description: true, date: true, userName: true },
   },
   createdBy: {
     select: { id: true, name: true },
@@ -47,8 +50,8 @@ router.get('/stats', async (req: Request, res: Response) => {
   try {
     const companyId = req.user!.companyId;
 
-    // Batch 1: Fetch raw data + financial aggregates (4 parallel queries instead of 14)
-    const [shipmentRows, containerRows, provisionAgg, disbursementAgg] = await Promise.all([
+    // Batch 1: Fetch raw data + financial aggregates (all in parallel)
+    const [shipmentRows, containerRows, provisionAgg, disbursementAgg, unpaidAgg, recentShipments, workflowAlerts] = await Promise.all([
       prisma.shipment.findMany({
         where: { companyId },
         select: { status: true, createdAt: true },
@@ -59,6 +62,19 @@ router.get('/stats', async (req: Request, res: Response) => {
       }),
       prisma.expense.aggregate({ where: { type: 'PROVISION', shipment: { companyId } }, _sum: { amount: true } }),
       prisma.expense.aggregate({ where: { type: 'DISBURSEMENT', shipment: { companyId } }, _sum: { amount: true } }),
+      prisma.expense.aggregate({ where: { type: 'DISBURSEMENT', paid: false, shipment: { companyId } }, _sum: { amount: true } }),
+      prisma.shipment.findMany({
+        where: { companyId },
+        select: {
+          id: true, trackingNumber: true, clientName: true, status: true, description: true,
+          vesselName: true, eta: true, createdAt: true, updatedAt: true,
+          containers: { select: { id: true, type: true, number: true } },
+          createdBy: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+      }),
+      generateAlerts(companyId),
     ]);
 
     // Compute shipment counts in-memory (replaces 5 DB queries)
@@ -94,18 +110,7 @@ router.get('/stats', async (req: Request, res: Response) => {
       if (deliveredStatuses.has(c.shipment.status)) containersDelivered++;
     }
 
-    // Batch 2: Unpaid + recent shipments + alerts (3 parallel queries)
-    const [unpaidAgg, recentShipments, workflowAlerts] = await Promise.all([
-      prisma.expense.aggregate({ where: { type: 'DISBURSEMENT', paid: false, shipment: { companyId } }, _sum: { amount: true } }),
-      prisma.shipment.findMany({
-        where: { companyId },
-        include: { containers: true, createdBy: { select: { id: true, name: true } } },
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-      }),
-      generateAlerts(companyId),
-    ]);
-
+    // Batch 2: Unpaid already fetched above
     const totalProvisions = provisionAgg._sum.amount || 0;
     const totalDisbursements = disbursementAgg._sum.amount || 0;
     const unpaid = unpaidAgg._sum.amount || 0;
@@ -178,7 +183,13 @@ router.get('/', async (req: Request, res: Response) => {
       where.createdById = req.user!.id;
     }
 
-    if (query.status !== 'ALL') {
+    if (query.statuses) {
+      // Multi-status filter: statuses=PENDING,DRAFT
+      const statusList = query.statuses.split(',').map(s => s.trim()).filter(Boolean);
+      if (statusList.length > 0) {
+        where.status = { in: statusList as any[] };
+      }
+    } else if (query.status !== 'ALL') {
       where.status = query.status as any;
     }
 
@@ -197,7 +208,7 @@ router.get('/', async (req: Request, res: Response) => {
       prisma.shipment.findMany({
         where,
         include: {
-          containers: true,
+          containers: { select: { id: true, number: true, type: true } },
           documents: { select: { id: true, type: true } },
           expenses: { select: { id: true, type: true, amount: true, paid: true } },
           createdBy: { select: { id: true, name: true } },

@@ -132,7 +132,7 @@ export const addDocumentSchema = z.object({
 
 export const shipmentQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
+  limit: z.coerce.number().int().min(1).max(200).default(20),
   status: z.enum([
     'ALL', 'DRAFT', 'PENDING', 'ARRIVED', 'DDI_OBTAINED',
     'DECLARATION_FILED', 'LIQUIDATION_ISSUED', 'CUSTOMS_PAID',
@@ -140,6 +140,7 @@ export const shipmentQuerySchema = z.object({
     'EXIT_NOTE_ISSUED', 'IN_DELIVERY', 'DELIVERED',
     'INVOICED', 'CLOSED', 'ARCHIVED',
   ]).default('ALL'),
+  statuses: z.string().optional(), // comma-separated status list e.g. "PENDING,DRAFT"
   search: z.string().optional(),
   sort: z.enum(['createdAt', 'updatedAt', 'trackingNumber', 'clientName']).default('createdAt'),
   order: z.enum(['asc', 'desc']).default('desc'),

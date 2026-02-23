@@ -112,16 +112,14 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
     setLoading(true);
     try {
       if (category === 'finance') {
-        const res = await api.get<{ shipments: Shipment[] }>('/shipments?limit=100');
+        const res = await api.get<{ shipments: Shipment[] }>('/shipments?limit=200');
         if (res.data?.shipments) setShipments(res.data.shipments);
       } else {
         const statuses = STATUS_GROUPS[category] || [];
-        const all: Shipment[] = [];
-        for (const st of statuses) {
-          const res = await api.get<{ shipments: Shipment[] }>(`/shipments?status=${st}&limit=50`);
-          if (res.data?.shipments) all.push(...res.data.shipments);
-        }
-        setShipments(all);
+        // Single request with comma-separated statuses
+        const statusParam = statuses.join(',');
+        const res = await api.get<{ shipments: Shipment[] }>(`/shipments?statuses=${statusParam}&limit=200`);
+        if (res.data?.shipments) setShipments(res.data.shipments);
       }
     } catch (e) {
       console.error('CategoryDetailView load error:', e);
