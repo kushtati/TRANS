@@ -25,9 +25,6 @@ export const env = {
   
   // AI (Gemini)
   GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
-
-  // OCR (Datalab / Chandra)
-  DATALAB_API_KEY: process.env.DATALAB_API_KEY || '',
 };
 
 export const isProduction = env.NODE_ENV === 'production';
